@@ -59,7 +59,7 @@ export default function ChatPage() {
   const [currentSessionId, setCurrentSessionId] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
-  const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [sidebarOpen, setSidebarOpen] = useState(true);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const [settings, setSettings] = useState<SettingsData>({
     // API配置
@@ -90,6 +90,8 @@ export default function ChatPage() {
     // 界面设置
     theme: 'system',
   });
+  const [isProcessing, setIsProcessing] = useState(false);
+  const [currentResponseId, setCurrentResponseId] = useState<string | null>(null);
 
   // 滚动到底部函数
   const scrollToBottom = () => {
@@ -209,12 +211,15 @@ export default function ChatPage() {
       const textBlock = block as TextBlock;
       
       // 查找或创建助手消息
-      const existingMessage = messages.find(m => m.role === 'assistant' && m.id === 'current-response');
+      const existingMessage = messages.find(m => m.role === 'assistant' && m.id === currentResponseId);
       
       if (!existingMessage) {
-        // 创建新的助手消息
+        // 创建新的助手消息，使用唯一ID
+        const responseId = `response-${uuidv4()}`;
+        setCurrentResponseId(responseId);
+        
         const assistantMessage: Message = {
-          id: 'current-response',
+          id: responseId,
           role: 'assistant',
           content: textBlock.text,
           timestamp: new Date(),
@@ -226,7 +231,7 @@ export default function ChatPage() {
         // 更新现有助手消息
         setMessages(prev => 
           prev.map(m => 
-            m.id === 'current-response' 
+            m.id === currentResponseId 
               ? { ...m, content: textBlock.text } 
               : m
           )
@@ -282,6 +287,10 @@ export default function ChatPage() {
   // 发送消息
   const handleSendMessage = async (content: string) => {
     if (!content.trim()) return;
+    
+    // 设置处理状态和重置当前响应ID
+    setIsProcessing(true);
+    setCurrentResponseId(null);
     
     // 检查 API 密钥是否已设置
     if (!settings.apiKey || settings.apiKey.trim() === '') {
@@ -372,18 +381,24 @@ export default function ChatPage() {
       // 完成对话后，将临时消息ID替换为永久ID
       setMessages(prev => 
         prev.map(m => 
-          m.id === 'current-response' 
+          m.id === currentResponseId 
             ? { ...m, id: uuidv4() } 
             : m
         ) as Message[]
       );
+      
+      // 重置当前响应ID
+      setCurrentResponseId(null);
+      
+      // 重置处理状态
+      setIsProcessing(false);
       
       // 保存更新后的会话状态
       if (currentSessionId) {
         const currentSession = sessions.find(s => s.id === currentSessionId);
         if (currentSession) {
           const finalMessages = messages.map(m => 
-            m.id === 'current-response' 
+            m.id === currentResponseId 
               ? { ...m, id: uuidv4() } 
               : m
           ) as Message[];
@@ -406,6 +421,10 @@ export default function ChatPage() {
     } catch (error) {
       console.error('发送消息时出错:', error);
       
+      // 重置状态
+      setCurrentResponseId(null);
+      setIsProcessing(false);
+      
       // 显示错误消息
       const errorMessage = error instanceof Error 
         ? error.message 
@@ -425,6 +444,9 @@ export default function ChatPage() {
     } finally {
       // 清除加载状态
       setIsLoading(false);
+      
+      // 确保处理状态被重置
+      setIsProcessing(false);
       
       // 滚动到底部
       scrollToBottom();

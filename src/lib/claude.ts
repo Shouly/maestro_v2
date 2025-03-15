@@ -240,26 +240,21 @@ export async function callClaudeAPI(
   
   // 准备选项
   const options = {
-    thinkingEnabled: config.thinkingEnabled,
+    thinkingEnabled: false,
     thinkingBudget: config.thinkingBudget,
     onlyNMostRecentImages: config.onlyNMostRecentImages,
     tokenEfficientToolsBeta: config.tokenEfficientToolsBeta,
-    promptCaching: config.promptCaching || false,
-    betas: [] as string[]
+    promptCaching: config.promptCaching || false
   };
   
-  // 添加beta标志
-  if (toolGroup.betaFlag) {
-    options.betas.push(toolGroup.betaFlag);
-  }
-  
-  if (config.tokenEfficientToolsBeta) {
-    options.betas.push('token-efficient-tools-2025-02-19');
-  }
-  
-  if (config.promptCaching) {
-    options.betas.push('prompt-caching-2024-07-31');
-  }
+  // 打印配置和工具信息，用于调试
+  console.log('Claude 配置信息:', {
+    model: config.model,
+    maxTokens: config.maxTokens,
+    toolVersion: config.toolVersion,
+    toolsCount: tools.length,
+    options
+  });
   
   // 调用API
   return client.handleToolCalls(

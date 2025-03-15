@@ -33,7 +33,6 @@ export class ClaudeApiClient {
       onlyNMostRecentImages?: number;
       tokenEfficientToolsBeta?: boolean;
       promptCaching?: boolean;
-      betas?: string[];
     }
   ): Promise<Message[]> {
     // 转换消息格式为Anthropic API兼容格式
@@ -49,18 +48,15 @@ export class ClaudeApiClient {
     // 准备额外参数
     const extraParams: Record<string, any> = {};
 
-    // 添加思考模式
+    // 暂时禁用思考模式，因为我们还没有正确实现 thinking 块的处理
+    /* 
     if (options?.thinkingEnabled && options?.thinkingBudget) {
       extraParams.thinking = {
         type: 'enabled',
         budget_tokens: options.thinkingBudget,
       };
     }
-
-    // 添加 beta 标志
-    if (options?.betas && options.betas.length > 0) {
-      extraParams.beta = options.betas;
-    }
+    */
 
     // 处理图像截断
     if (options?.onlyNMostRecentImages) {
@@ -73,10 +69,20 @@ export class ClaudeApiClient {
     }
 
     try {
+      // 打印请求参数，用于调试
+      console.log('Claude API 请求参数:', {
+        model,
+        max_tokens: Math.min(maxTokens, 64000),
+        system: systemPrompt,
+        messages: anthropicMessages,
+        tools: anthropicTools,
+        extraParams
+      });
+      
       // 使用流式响应
       const stream = await this.client.messages.stream({
         model: model,
-        max_tokens: maxTokens,
+        max_tokens: Math.min(maxTokens, 64000),
         messages: anthropicMessages as any,
         system: systemPrompt,
         tools: anthropicTools as any,
@@ -255,7 +261,10 @@ export class ClaudeApiClient {
 
   // 转换为Anthropic消息格式
   private convertToAnthropicMessages(messages: Message[]) {
-    return messages.map(message => {
+    // 打印转换前的消息
+    console.log('转换前的消息:', JSON.stringify(messages, null, 2));
+    
+    const convertedMessages = messages.map(message => {
       // 转换消息内容
       const content = message.content.map(block => {
         if (block.type === 'text') {
@@ -300,6 +309,11 @@ export class ClaudeApiClient {
         content,
       };
     });
+    
+    // 打印转换后的消息
+    console.log('转换后的消息:', JSON.stringify(convertedMessages, null, 2));
+    
+    return convertedMessages;
   }
 
   // 创建工具结果块
