@@ -92,9 +92,11 @@ const Navbar = React.forwardRef<HTMLElement, NavbarProps>(
           
           {/* 行动按钮 - 移动端隐藏 */}
           <div className="hidden md:block">
-            <Button size="md" variant="gradient" rounded="full">
-              开始使用
-            </Button>
+            <Link href="/chat">
+              <Button size="md" variant="gradient" rounded="full">
+                开始使用
+              </Button>
+            </Link>
           </div>
           
           {/* 移动端菜单按钮 */}
@@ -122,9 +124,11 @@ const Navbar = React.forwardRef<HTMLElement, NavbarProps>(
             <NavItem href="#features">功能</NavItem>
             <NavItem href="#download">下载</NavItem>
             <div className="pt-4">
-              <Button size="lg" variant="gradient" rounded="full">
-                开始使用
-              </Button>
+              <Link href="/chat">
+                <Button size="lg" variant="gradient" rounded="full">
+                  开始使用
+                </Button>
+              </Link>
             </div>
           </div>
         </div>

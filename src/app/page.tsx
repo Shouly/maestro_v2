@@ -6,6 +6,7 @@ import { Footer } from '@/components/layout/Footer';
 import { Hero } from '@/components/layout/Hero';
 import { FeatureCard } from '@/components/ui/FeatureCard';
 import { Button } from '@/components/ui/Button';
+import Link from 'next/link';
 
 export default function Home() {
   return (
@@ -180,13 +181,17 @@ export default function Home() {
             加入我们，探索 AI 驱动的计算机控制的无限可能，让 Maestro 成为您的智能助手
           </p>
           <div className="flex flex-col sm:flex-row justify-center gap-4">
-            <Button size="lg" variant="gradient" rounded="full" className="group">
-              立即下载
-              <ArrowRight className="ml-2 h-4 w-4 transition-transform group-hover:translate-x-1" />
-            </Button>
-            <Button size="lg" variant="outline" rounded="full">
-              查看文档
-            </Button>
+            <Link href="/chat">
+              <Button size="lg" variant="gradient" rounded="full" className="group">
+                开始对话
+                <ArrowRight className="ml-2 h-4 w-4 transition-transform group-hover:translate-x-1" />
+              </Button>
+            </Link>
+            <Link href="#download">
+              <Button size="lg" variant="outline" rounded="full">
+                立即下载
+              </Button>
+            </Link>
           </div>
         </div>
       </div>

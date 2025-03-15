@@ -4,6 +4,7 @@ import React from 'react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/Button';
 import { Sparkles, ArrowRight } from 'lucide-react';
+import Link from 'next/link';
 
 interface HeroProps extends Omit<React.HTMLAttributes<HTMLDivElement>, 'title'> {
   title: React.ReactNode;
@@ -106,31 +107,55 @@ const Hero = React.forwardRef<HTMLDivElement, HeroProps>(
               align === 'left' && "justify-start"
             )}>
               {primaryAction && (
-                <Button 
-                  size="lg" 
-                  variant="gradient"
-                  rounded="full"
-                  onClick={primaryAction.onClick}
-                  className="group"
-                  {...(primaryAction.href ? { as: 'a', href: primaryAction.href } : {})}
-                >
-                  <span>{primaryAction.text}</span>
-                  <ArrowRight className="ml-2 h-4 w-4 transition-transform group-hover:translate-x-1" />
-                </Button>
+                primaryAction.href ? (
+                  <Link href={primaryAction.href}>
+                    <Button 
+                      size="lg" 
+                      variant="gradient"
+                      rounded="full"
+                      onClick={primaryAction.onClick}
+                      className="group"
+                    >
+                      <span>{primaryAction.text}</span>
+                      <ArrowRight className="ml-2 h-4 w-4 transition-transform group-hover:translate-x-1" />
+                    </Button>
+                  </Link>
+                ) : (
+                  <Button 
+                    size="lg" 
+                    variant="gradient"
+                    rounded="full"
+                    onClick={primaryAction.onClick}
+                    className="group"
+                  >
+                    <span>{primaryAction.text}</span>
+                    <ArrowRight className="ml-2 h-4 w-4 transition-transform group-hover:translate-x-1" />
+                  </Button>
+                )
               )}
               
               {secondaryAction && (
-                <Button 
-                  variant="outline" 
-                  size="lg"
-                  rounded="full"
-                  onClick={secondaryAction.onClick}
-                  className="group"
-                  {...(secondaryAction.href ? { as: 'a', href: secondaryAction.href } : {})}
-                >
-                  <span>{secondaryAction.text}</span>
-                  <ArrowRight className="ml-2 h-4 w-4 opacity-70 transition-transform group-hover:translate-x-1" />
-                </Button>
+                secondaryAction.href ? (
+                  <Link href={secondaryAction.href}>
+                    <Button 
+                      size="lg" 
+                      variant="outline"
+                      rounded="full"
+                      onClick={secondaryAction.onClick}
+                    >
+                      {secondaryAction.text}
+                    </Button>
+                  </Link>
+                ) : (
+                  <Button 
+                    size="lg" 
+                    variant="outline"
+                    rounded="full"
+                    onClick={secondaryAction.onClick}
+                  >
+                    {secondaryAction.text}
+                  </Button>
+                )
               )}
             </div>
           )}
