@@ -15,6 +15,15 @@ import { core, event } from '@tauri-apps/api';
 const { invoke } = core;
 const { listen } = event;
 
+import { 
+  callClaudeAPI, 
+  ContentBlock, 
+  Message as ClaudeMessage, 
+  TextBlock, 
+  ToolResult, 
+  ToolUseBlock 
+} from '@/lib/claude';
+
 // 消息类型
 interface Message {
   id: string;
@@ -34,7 +43,7 @@ interface Tool {
 }
 
 // 工具结果类型
-interface ToolResult {
+interface ToolResultType {
   output?: string;
   error?: string;
   base64_image?: string;
@@ -44,6 +53,7 @@ interface ToolResult {
 export default function ChatPage() {
   // 状态
   const [messages, setMessages] = useState<Message[]>([]);
+  const [claudeMessages, setClaudeMessages] = useState<ClaudeMessage[]>([]);
   const [tools, setTools] = useState<Tool[]>([]);
   const [sessions, setSessions] = useState<ChatSession[]>([]);
   const [currentSessionId, setCurrentSessionId] = useState<string | null>(null);
@@ -102,14 +112,25 @@ export default function ChatPage() {
         setCurrentSessionId('1');
     
         // 添加欢迎消息
-        setMessages([
-          {
-            id: uuidv4(),
-            role: 'assistant',
-            content: '你好！我是 Maestro，你的 AI 助手。我可以帮助你控制计算机、执行命令和编辑文件。请告诉我你需要什么帮助？',
-            timestamp: new Date(),
-          }
-        ]);
+        const welcomeMessage: Message = {
+          id: uuidv4(),
+          role: 'assistant',
+          content: '你好！我是 Maestro，你的 AI 助手。我可以帮助你控制计算机、执行命令和编辑文件。请告诉我你需要什么帮助？',
+          timestamp: new Date(),
+        };
+        
+        setMessages([welcomeMessage]);
+        
+        // 初始化 Claude 消息
+        const welcomeClaudeMessage: ClaudeMessage = {
+          role: 'assistant',
+          content: [{
+            type: 'text',
+            text: '你好！我是 Maestro，你的 AI 助手。我可以帮助你控制计算机、执行命令和编辑文件。请告诉我你需要什么帮助？'
+          }]
+        };
+        
+        setClaudeMessages([welcomeClaudeMessage]);
 
         // 获取计算机工具配置
         try {
@@ -150,6 +171,70 @@ export default function ChatPage() {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages, tools]);
 
+  // 处理内容块
+  const handleContentBlock = (block: ContentBlock) => {
+    if (block.type === 'text') {
+      // 文本块不需要特殊处理，会在最终响应中显示
+    } else if (block.type === 'tool_use') {
+      // 工具使用块，添加到工具输出
+      const toolUseBlock = block as ToolUseBlock;
+      
+      let title = '使用工具';
+      let content = JSON.stringify(toolUseBlock.input, null, 2);
+      let type: 'command' | 'screenshot' | 'code' | 'file' | 'info' = 'info';
+      
+      if (toolUseBlock.name === 'computer') {
+        title = '计算机操作';
+        type = 'screenshot';
+      } else if (toolUseBlock.name === 'bash') {
+        title = '执行命令';
+        type = 'command';
+        content = toolUseBlock.input.command;
+      } else if (toolUseBlock.name === 'edit') {
+        title = '文件操作';
+        type = 'file';
+        content = `${toolUseBlock.input.command} ${toolUseBlock.input.path}`;
+      }
+      
+      const toolOutput: Tool = {
+        id: toolUseBlock.id,
+        type,
+        title,
+        content,
+        timestamp: new Date(),
+      };
+      
+      setTools(prev => [...prev, toolOutput]);
+    }
+  };
+
+  // 处理工具结果
+  const handleToolResult = (result: ToolResult, toolUseId: string) => {
+    let type: 'success' | 'error' | 'code' | 'screenshot' = 'success';
+    let title = '工具结果';
+    let content = result.output || '';
+    
+    if (result.error) {
+      type = 'error';
+      title = '错误';
+      content = result.error;
+    } else if (result.base64_image) {
+      type = 'screenshot';
+      title = '屏幕截图';
+    }
+    
+    const toolOutput: Tool = {
+      id: uuidv4(),
+      type,
+      title,
+      content,
+      imageData: result.base64_image,
+      timestamp: new Date(),
+    };
+    
+    setTools(prev => [...prev, toolOutput]);
+  };
+
   // 发送消息
   const handleSendMessage = async (content: string) => {
     if (!content.trim()) return;
@@ -163,6 +248,17 @@ export default function ChatPage() {
     };
 
     setMessages(prev => [...prev, userMessage]);
+    
+    // 添加 Claude 用户消息
+    const userClaudeMessage: ClaudeMessage = {
+      role: 'user',
+      content: [{
+        type: 'text',
+        text: content
+      }]
+    };
+    
+    setClaudeMessages(prev => [...prev, userClaudeMessage]);
     setIsLoading(true);
 
     try {
@@ -177,195 +273,50 @@ export default function ChatPage() {
         );
       }
 
-      // 这里应该调用 Claude API 或模拟响应
-      // 模拟 AI 响应
-      setTimeout(async () => {
-        // 模拟工具调用
-        if (content.toLowerCase().includes('截图') || content.toLowerCase().includes('屏幕')) {
-          // 执行截图命令
-          try {
-            const result = await invoke<ToolResult>('take_screenshot');
-            
-            if (result.base64_image) {
-              // 添加截图工具输出
-              const toolOutput: Tool = {
-                id: uuidv4(),
-                type: 'screenshot',
-                title: '屏幕截图',
-                content: '截取了当前屏幕',
-                imageData: result.base64_image,
-                timestamp: new Date(),
-              };
-              
-              setTools(prev => [...prev, toolOutput]);
-            }
-            
-            if (result.error) {
-              // 添加错误工具输出
-              const errorOutput: Tool = {
-                id: uuidv4(),
-                type: 'error',
-                title: '截图错误',
-                content: result.error,
-                timestamp: new Date(),
-              };
-              
-              setTools(prev => [...prev, errorOutput]);
-            }
-          } catch (error) {
-            console.error('Screenshot error:', error);
-            
-            // 添加错误工具输出
-            const errorOutput: Tool = {
-              id: uuidv4(),
-              type: 'error',
-              title: '截图错误',
-              content: String(error),
-              timestamp: new Date(),
-            };
-            
-            setTools(prev => [...prev, errorOutput]);
-          }
-        } else if (content.toLowerCase().includes('bash') || content.toLowerCase().includes('命令') || content.toLowerCase().includes('执行')) {
-          // 执行 Bash 命令
-          try {
-            // 从消息中提取命令（简化示例）
-            const commandMatch = content.match(/执行[：:]\s*(.+)/) || content.match(/运行[：:]\s*(.+)/);
-            const command = commandMatch ? commandMatch[1].trim() : 'echo "Hello from Bash"';
-            
-            // 添加命令工具输出
-            const commandOutput: Tool = {
-              id: uuidv4(),
-              type: 'command',
-              title: '执行命令',
-              content: command,
-              timestamp: new Date(),
-            };
-            
-            setTools(prev => [...prev, commandOutput]);
-            
-            // 调用 Bash 工具
-            const result = await invoke<ToolResult>('execute_bash_command', {
-              args: { command, restart: false }
-            });
-            
-            if (result.output) {
-              // 添加成功工具输出
-              const successOutput: Tool = {
-                id: uuidv4(),
-                type: 'success',
-                title: '命令输出',
-                content: result.output,
-                timestamp: new Date(),
-              };
-              
-              setTools(prev => [...prev, successOutput]);
-            }
-            
-            if (result.error) {
-              // 添加错误工具输出
-              const errorOutput: Tool = {
-                id: uuidv4(),
-                type: 'error',
-                title: '命令错误',
-                content: result.error,
-                timestamp: new Date(),
-              };
-              
-              setTools(prev => [...prev, errorOutput]);
-            }
-          } catch (error) {
-            console.error('Bash command error:', error);
-            
-            // 添加错误工具输出
-            const errorOutput: Tool = {
-              id: uuidv4(),
-              type: 'error',
-              title: '命令错误',
-              content: String(error),
-              timestamp: new Date(),
-            };
-            
-            setTools(prev => [...prev, errorOutput]);
-          }
-        } else if (content.toLowerCase().includes('文件') || content.toLowerCase().includes('编辑')) {
-          // 执行文件编辑命令
-          try {
-            // 从消息中提取路径（简化示例）
-            const pathMatch = content.match(/文件[：:]\s*(.+)/) || content.match(/路径[：:]\s*(.+)/);
-            const path = pathMatch ? pathMatch[1].trim() : '/tmp/example.txt';
-            
-            // 添加文件工具输出
-            const fileOutput: Tool = {
-              id: uuidv4(),
-              type: 'file',
-              title: '查看文件',
-              content: path,
-              timestamp: new Date(),
-            };
-            
-            setTools(prev => [...prev, fileOutput]);
-            
-            // 调用编辑工具
-            const result = await invoke<ToolResult>('execute_edit_command', {
-              args: { 
-                command: 'view',
-                path,
-              }
-            });
-            
-            if (result.output) {
-              // 添加成功工具输出
-              const successOutput: Tool = {
-                id: uuidv4(),
-                type: 'code',
-                title: '文件内容',
-                content: result.output,
-                timestamp: new Date(),
-              };
-              
-              setTools(prev => [...prev, successOutput]);
-            }
-            
-            if (result.error) {
-              // 添加错误工具输出
-              const errorOutput: Tool = {
-                id: uuidv4(),
-                type: 'error',
-                title: '文件错误',
-                content: result.error,
-                timestamp: new Date(),
-              };
-              
-              setTools(prev => [...prev, errorOutput]);
-            }
-          } catch (error) {
-            console.error('File edit error:', error);
-            
-            // 添加错误工具输出
-            const errorOutput: Tool = {
-              id: uuidv4(),
-              type: 'error',
-              title: '文件错误',
-              content: String(error),
-              timestamp: new Date(),
-            };
-            
-            setTools(prev => [...prev, errorOutput]);
-          }
-        }
-
+      // 调用 Claude API
+      const updatedMessages = await callClaudeAPI(
+        claudeMessages,
+        {
+          apiKey: settings.apiKey,
+          apiProvider: 'anthropic',
+          modelVersion: settings.modelVersion,
+          maxOutputTokens: settings.maxOutputTokens,
+          systemPrompt: settings.customSystemPrompt,
+          onlyNMostRecentImages: settings.onlyNMostRecentImages,
+          thinkingEnabled: settings.thinkingEnabled,
+          thinkingBudget: settings.thinkingBudget,
+          tokenEfficientToolsBeta: settings.tokenEfficientToolsBeta,
+          enableComputerTool: settings.enableComputerTool,
+          enableBashTool: settings.enableBashTool,
+          enableEditTool: settings.enableEditTool,
+        },
+        handleContentBlock,
+        handleToolResult
+      );
+      
+      setClaudeMessages(updatedMessages);
+      
+      // 提取最后一条 AI 消息
+      const lastMessage = updatedMessages[updatedMessages.length - 1];
+      if (lastMessage.role === 'assistant') {
+        // 提取文本内容
+        const textContent = lastMessage.content
+          .filter(block => block.type === 'text')
+          .map(block => (block as TextBlock).text)
+          .join('\n\n');
+        
         // 添加 AI 响应
         const assistantMessage: Message = {
           id: uuidv4(),
           role: 'assistant',
-          content: `我已经处理了你的请求："${content}"。请查看工具输出区域获取结果。`,
+          content: textContent,
           timestamp: new Date(),
         };
-
+        
         setMessages(prev => [...prev, assistantMessage]);
-        setIsLoading(false);
-      }, 1500);
+      }
+      
+      setIsLoading(false);
     } catch (error) {
       console.error('Error processing message:', error);
       
@@ -396,6 +347,7 @@ export default function ChatPage() {
     setCurrentSessionId(newSession.id);
     setMessages([]);
     setTools([]);
+    setClaudeMessages([]);
   };
 
   // 选择会话
@@ -421,6 +373,16 @@ export default function ChatPage() {
         role: 'assistant',
         content: '已加载会话。我可以继续帮助你吗？',
         timestamp: new Date(),
+      }
+    ]);
+    
+    setClaudeMessages([
+      {
+        role: 'assistant',
+        content: [{
+          type: 'text',
+          text: '已加载会话。我可以继续帮助你吗？'
+        }]
       }
     ]);
     
@@ -619,6 +581,7 @@ export default function ChatPage() {
                     type={tool.type}
                     title={tool.title}
                     content={tool.content}
+                    imageData={tool.imageData}
                     timestamp={tool.timestamp}
                   />
                 ))
