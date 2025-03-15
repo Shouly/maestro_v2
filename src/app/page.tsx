@@ -1,3 +1,5 @@
+"use client";
+
 import { Cpu, Globe, Shield, Sparkles, ArrowRight, Check } from 'lucide-react';
 import { Navbar } from '@/components/layout/Navbar';
 import { Footer } from '@/components/layout/Footer';

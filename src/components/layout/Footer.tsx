@@ -1,3 +1,5 @@
+"use client";
+
 import React from 'react';
 import Link from 'next/link';
 import { Command, ArrowUpRight, Instagram, Twitter, Github, Linkedin } from 'lucide-react';
