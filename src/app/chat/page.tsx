@@ -40,11 +40,32 @@ export default function ChatPage() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const [settings, setSettings] = useState<SettingsData>({
+    // API配置
+    apiProvider: 'anthropic',
     apiKey: '',
-    modelVersion: 'claude-3-sonnet-20240229',
+    modelVersion: 'claude-3-7-sonnet-20250219',
+    
+    // 工具配置
+    toolVersion: 'computer_use_20250124',
     enableComputerTool: true,
     enableBashTool: true,
     enableEditTool: true,
+    
+    // 输出配置
+    maxOutputTokens: 128000,
+    defaultOutputTokens: 16384,
+    thinkingEnabled: true,
+    thinkingBudget: 8192,
+    
+    // 图像和显示配置
+    onlyNMostRecentImages: 3,
+    hideScreenshots: false,
+    tokenEfficientToolsBeta: false,
+    
+    // 系统提示配置
+    customSystemPrompt: '',
+    
+    // 界面设置
     theme: 'system',
   });
 
