@@ -20,8 +20,8 @@ export default function Home() {
         title="AI驱动的计算机控制"
         description="Maestro 使用 Tauri 和 Rust 构建，通过 Claude AI 模型让您的计算机执行各种任务，提高工作效率"
         primaryAction={{
-          text: "立即下载",
-          href: "#download"
+          text: "开始对话",
+          href: "/chat"
         }}
         secondaryAction={{
           text: "查看文档",

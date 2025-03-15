@@ -84,10 +84,10 @@ const Navbar = React.forwardRef<HTMLElement, NavbarProps>(
           
           {/* 导航链接 - 移动端隐藏 */}
           <div className="hidden md:flex space-x-8">
+            <NavItem href="/">首页</NavItem>
+            <NavItem href="/chat">对话</NavItem>
             <NavItem href="#features">功能</NavItem>
-            <NavItem href="#docs">文档</NavItem>
             <NavItem href="#download">下载</NavItem>
-            <NavItem href="#about">关于</NavItem>
           </div>
           
           {/* 行动按钮 - 移动端隐藏 */}
@@ -117,10 +117,10 @@ const Navbar = React.forwardRef<HTMLElement, NavbarProps>(
               ? "opacity-100 pointer-events-auto" 
               : "opacity-0 pointer-events-none"
           )}>
+            <NavItem href="/">首页</NavItem>
+            <NavItem href="/chat">对话</NavItem>
             <NavItem href="#features">功能</NavItem>
-            <NavItem href="#docs">文档</NavItem>
             <NavItem href="#download">下载</NavItem>
-            <NavItem href="#about">关于</NavItem>
             <div className="pt-4">
               <Button size="lg" variant="gradient" rounded="full">
                 开始使用
