@@ -245,9 +245,36 @@ export class ClaudeApiClient {
               break;
 
             case 'edit':
+              // 转换参数格式
+              const transformedEditInput = { ...toolInput };
+              
+              // 将命令名称转换为后端期望的格式
+              if (transformedEditInput.command === 'undo_edit') {
+                transformedEditInput.command = 'undo_edit';
+              }
+              
+              // 将参数名称转换为后端期望的格式
+              if (transformedEditInput.file_text !== undefined) {
+                transformedEditInput.file_text = transformedEditInput.file_text;
+              }
+              
+              if (transformedEditInput.old_str !== undefined) {
+                transformedEditInput.old_str = transformedEditInput.old_str;
+              }
+              
+              if (transformedEditInput.new_str !== undefined) {
+                transformedEditInput.new_str = transformedEditInput.new_str;
+              }
+              
+              if (transformedEditInput.insert_line !== undefined) {
+                transformedEditInput.insert_line = transformedEditInput.insert_line;
+              }
+              
+              console.log('执行编辑操作:', JSON.stringify(transformedEditInput, null, 2));
+              
               // 执行文件编辑
               result = await core.invoke<ToolResult>('execute_edit_command', {
-                args: { ...toolInput }
+                args: { ...transformedEditInput }
               });
               break;
 

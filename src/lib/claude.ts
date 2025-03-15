@@ -182,14 +182,19 @@ export const AVAILABLE_TOOLS: Tool[] = [
       properties: {
         command: {
           type: 'string',
-          enum: ['view', 'create', 'str_replace', 'insert', 'undo'],
+          enum: ['view', 'create', 'str_replace', 'insert', 'undo_edit'],
         },
         path: { type: 'string' },
-        content: { type: 'string' },
-        old_string: { type: 'string' },
-        new_string: { type: 'string' },
-        line_number: { type: 'number' },
-        view_range: { type: 'string' },
+        file_text: { type: 'string' },
+        view_range: { 
+          type: 'array',
+          items: { type: 'number' },
+          minItems: 2,
+          maxItems: 2
+        },
+        old_str: { type: 'string' },
+        new_str: { type: 'string' },
+        insert_line: { type: 'number' },
       },
       required: ['command', 'path'],
       additionalProperties: false,
