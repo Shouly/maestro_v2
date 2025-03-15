@@ -6,6 +6,7 @@ use maestro::commands;
 // 导入日志模块
 mod logger;
 use log::{info, warn, error};
+use std::fs;
 
 // 添加一个新的命令来获取屏幕尺寸
 #[tauri::command]
@@ -27,6 +28,16 @@ fn get_log_file_path() -> String {
     logger::get_current_log_file()
 }
 
+// 添加一个新的命令来读取日志文件内容
+#[tauri::command]
+fn read_log_file() -> Result<String, String> {
+    let path = logger::get_current_log_file();
+    match fs::read_to_string(&path) {
+        Ok(content) => Ok(content),
+        Err(e) => Err(format!("无法读取日志文件: {}", e))
+    }
+}
+
 fn main() {
     // 初始化日志系统
     logger::init();
@@ -43,6 +54,7 @@ fn main() {
             commands::greet,
             get_screen_size,
             get_log_file_path,
+            read_log_file,
         ]);
     
     info!("Tauri 应用程序初始化完成");

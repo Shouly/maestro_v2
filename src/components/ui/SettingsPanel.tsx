@@ -1,7 +1,8 @@
 import React, { useState } from 'react';
-import { X, Save, Eye, EyeOff, Info } from 'lucide-react';
+import { X, Save, Eye, EyeOff, Info, FileText } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Button } from './Button';
+import LogViewerModal from '../LogViewerModal';
 
 export interface SettingsProps {
   isOpen: boolean;
@@ -50,6 +51,7 @@ export const SettingsPanel: React.FC<SettingsProps> = ({
 }) => {
   const [settings, setSettings] = useState<SettingsData>(initialSettings);
   const [showApiKey, setShowApiKey] = useState(false);
+  const [logViewerOpen, setLogViewerOpen] = useState(false);
   
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
     const { name, value, type } = e.target;
@@ -444,6 +446,25 @@ export const SettingsPanel: React.FC<SettingsProps> = ({
               </select>
             </div>
           </div>
+          
+          {/* 开发者工具 */}
+          <div className="space-y-4">
+            <h3 className="text-lg font-medium">开发者工具</h3>
+            
+            <div className="space-y-2">
+              <Button
+                variant="outline"
+                onClick={() => setLogViewerOpen(true)}
+                className="flex items-center"
+              >
+                <FileText className="w-4 h-4 mr-2" />
+                查看应用程序日志
+              </Button>
+              <p className="text-xs text-[hsl(var(--muted-foreground))]">
+                查看应用程序的运行日志，用于诊断问题
+              </p>
+            </div>
+          </div>
         </div>
         
         {/* 底部按钮 */}
@@ -465,6 +486,12 @@ export const SettingsPanel: React.FC<SettingsProps> = ({
           </Button>
         </div>
       </div>
+      
+      {/* 日志查看器模态框 */}
+      <LogViewerModal
+        isOpen={logViewerOpen}
+        onClose={() => setLogViewerOpen(false)}
+      />
     </div>
   );
 }; 
