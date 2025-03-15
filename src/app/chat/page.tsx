@@ -502,8 +502,14 @@ export default function ChatPage() {
 
   return (
     <div className="flex h-screen bg-[hsl(var(--background))]">
-      {/* 侧边栏 */}
-      <div className={`fixed inset-0 z-40 lg:relative lg:z-0 lg:w-80 transform transition-transform duration-300 ease-in-out ${sidebarOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'} bg-[hsl(var(--card))] border-r border-[hsl(var(--border))]`}>
+      {/* 桌面导航 - 确保始终在最左侧 */}
+      <MainNavigation
+        currentPath="/chat"
+        onOpenSettings={() => setSettingsOpen(true)}
+      />
+      
+      {/* 侧边栏 - 调整位置在导航栏右侧 */}
+      <div className={`fixed md:relative z-40 md:z-0 md:w-80 transform transition-transform duration-300 ease-in-out ${sidebarOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0'} bg-[hsl(var(--card))] border-r border-[hsl(var(--border))]`}>
         <div className="flex flex-col h-full">
           <div className="p-4 border-b border-[hsl(var(--border))]">
             <div className="flex items-center justify-between">
@@ -514,7 +520,7 @@ export default function ChatPage() {
               <Button
                 variant="ghost"
                 size="icon"
-                className="lg:hidden"
+                className="md:hidden"
                 onClick={toggleSidebar}
               >
                 <Menu className="h-5 w-5" />
@@ -566,12 +572,6 @@ export default function ChatPage() {
         <MobileNavigation
           isOpen={sidebarOpen}
           onClose={() => setSidebarOpen(false)}
-          currentPath="/chat"
-          onOpenSettings={() => setSettingsOpen(true)}
-        />
-        
-        {/* 桌面导航 */}
-        <MainNavigation
           currentPath="/chat"
           onOpenSettings={() => setSettingsOpen(true)}
         />

@@ -10,6 +10,7 @@ export class ClaudeApiClient {
   constructor(apiKey: string) {
     this.client = new Anthropic({
       apiKey: apiKey,
+      dangerouslyAllowBrowser: true,
     });
   }
 
