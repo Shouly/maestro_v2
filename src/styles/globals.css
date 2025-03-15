@@ -4,8 +4,8 @@
 
 @layer base {
   :root {
-    /* 2025 现代设计风格明亮主题 */
-    --background: 210 40% 98%;
+    /* 明亮主题 */
+    --background: 0 0% 100%;
     --foreground: 222 47% 11%;
 
     --card: 0 0% 100%;
@@ -14,48 +14,48 @@
     --popover: 0 0% 100%;
     --popover-foreground: 222 47% 11%;
 
-    /* 主色调：深蓝色 - 更加专业和可靠 */
-    --primary: 222 47% 35%;
-    --primary-foreground: 210 40% 98%;
+    /* 主色调：明亮的蓝色 #126dff (HSL: 217 100% 54%) */
+    --primary: 217 100% 54%;
+    --primary-foreground: 0 0% 100%;
 
-    /* 次要色调：柔和的灰蓝色 */
+    /* 次要色调：浅灰色 */
     --secondary: 210 40% 96.1%;
     --secondary-foreground: 222 47% 20%;
 
     /* 中性灰 */
-    --muted: 210 40% 93%;
+    --muted: 210 40% 96.1%;
     --muted-foreground: 215 16% 47%;
 
-    /* 强调色：鲜艳的青绿色 - 现代感强 */
-    --accent: 174 75% 45%;
+    /* 强调色：橙色 - 与蓝色形成鲜明对比 */
+    --accent: 32 100% 60%;
     --accent-foreground: 0 0% 100%;
 
     /* 警告红 */
     --destructive: 0 84% 60%;
-    --destructive-foreground: 210 40% 98%;
+    --destructive-foreground: 0 0% 100%;
 
     /* 边框和输入框 */
     --border: 214.3 31.8% 91.4%;
     --input: 214.3 31.8% 91.4%;
-    --ring: 222 47% 35%;
+    --ring: 217 100% 54%;
 
-    /* 圆角 - 更加现代的圆角 */
+    /* 圆角 */
     --radius: 0.5rem;
 
-    /* 阴影 - 更加精致的阴影效果 */
-    --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.04);
-    --shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
-    --shadow-md: 0 8px 24px rgba(0, 0, 0, 0.08);
-    --shadow-lg: 0 16px 38px rgba(0, 0, 0, 0.07);
+    /* 阴影效果 */
+    --shadow-sm: 0 1px 2px rgba(18, 109, 255, 0.05);
+    --shadow: 0 4px 12px rgba(18, 109, 255, 0.08);
+    --shadow-md: 0 8px 24px rgba(18, 109, 255, 0.1);
+    --shadow-lg: 0 16px 38px rgba(18, 109, 255, 0.12);
 
-    /* 渐变 - 更加现代的渐变色 */
-    --gradient-primary: linear-gradient(135deg, hsl(222, 47%, 35%), hsl(240, 47%, 40%));
-    --gradient-accent: linear-gradient(135deg, hsl(174, 75%, 45%), hsl(190, 75%, 50%));
-    --gradient-cool: linear-gradient(135deg, hsl(222, 47%, 35%), hsl(174, 75%, 45%));
+    /* 渐变色 */
+    --gradient-primary: linear-gradient(135deg, #126dff, #3d8bff);
+    --gradient-accent: linear-gradient(135deg, #ff9500, #ffb74d);
+    --gradient-cool: linear-gradient(135deg, #126dff, #00c2ff);
   }
 
   .dark {
-    /* 2025 现代设计风格暗色主题 */
+    /* 暗色主题 */
     --background: 222 47% 8%;
     --foreground: 210 40% 98%;
 
@@ -66,8 +66,8 @@
     --popover-foreground: 210 40% 98%;
 
     /* 主色调：亮蓝色 */
-    --primary: 222 47% 60%;
-    --primary-foreground: 210 40% 98%;
+    --primary: 217 100% 65%;
+    --primary-foreground: 0 0% 100%;
 
     /* 深灰色 */
     --secondary: 217 32% 17%;
@@ -77,18 +77,18 @@
     --muted: 217 32% 17%;
     --muted-foreground: 215 20% 65%;
 
-    /* 强调色：亮青绿色 */
-    --accent: 174 75% 55%;
-    --accent-foreground: 222 47% 10%;
+    /* 强调色：亮橙色 */
+    --accent: 32 100% 65%;
+    --accent-foreground: 0 0% 0%;
 
     /* 亮红色 */
     --destructive: 0 62.8% 65.6%;
-    --destructive-foreground: 210 40% 98%;
+    --destructive-foreground: 0 0% 100%;
 
     /* 边框和输入框 */
     --border: 217 32% 17%;
     --input: 217 32% 17%;
-    --ring: 222 47% 60%;
+    --ring: 217 100% 65%;
   }
 }
 
@@ -106,7 +106,7 @@
     font-feature-settings: "rlig" 1, "calt" 1;
   }
   
-  /* 现代风格的标题 */
+  /* 标题样式 */
   h1, h2, h3, h4, h5, h6 {
     @apply font-bold tracking-tight;
   }
@@ -123,33 +123,33 @@
     @apply text-2xl md:text-3xl;
   }
   
-  /* 现代风格的链接 */
+  /* 链接样式 */
   a {
     @apply text-[hsl(var(--primary))] hover:text-[hsl(var(--primary))/80] transition-colors;
   }
   
-  /* 现代风格的按钮悬停效果 */
+  /* 按钮悬停效果 */
   button, 
   .button {
     @apply transition-all duration-300;
   }
   
-  /* 现代风格的卡片悬停效果 */
+  /* 卡片悬停效果 */
   .card-hover {
     @apply transition-all duration-300 hover:shadow-md hover:translate-y-[-4px];
   }
   
-  /* 现代风格的渐变文本 */
+  /* 渐变文本 */
   .gradient-text {
     @apply bg-clip-text text-transparent bg-gradient-to-r from-[hsl(var(--primary))] to-[hsl(var(--accent))];
   }
   
-  /* 现代风格的渐变背景 */
+  /* 渐变背景 */
   .gradient-bg {
     @apply bg-gradient-to-r from-[hsl(var(--primary))] to-[hsl(var(--accent))];
   }
   
-  /* 现代风格的模糊背景 */
+  /* 模糊背景 */
   .blur-bg {
     @apply backdrop-blur-md bg-[hsl(var(--background))/80];
   }
