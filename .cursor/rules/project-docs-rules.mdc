@@ -1,0 +1,8 @@
+---
+description: Project documentation rules
+globs: 
+alwaysApply: true
+---
+Always refer to [project-docs-rules.mdc](mdc:.cursor/rules/project-docs-rules.mdc) for the project requirements and [tech_stack_document.md](mdc:document/tech_stack_document.md) for the tech stack. Unless the user says otherwise or has defined new requirements or additional flow.
+
+中文回答问题。
