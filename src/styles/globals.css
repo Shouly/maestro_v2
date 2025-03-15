@@ -4,77 +4,77 @@
 
 @layer base {
   :root {
-    /* Canva风格的明亮主题 */
-    --background: 210 40% 98%;
-    --foreground: 222 47% 11%;
+    /* 更精致的明亮主题 */
+    --background: 0 0% 100%;
+    --foreground: 240 10% 3.9%;
 
     --card: 0 0% 100%;
-    --card-foreground: 222 47% 11%;
+    --card-foreground: 240 10% 3.9%;
 
     --popover: 0 0% 100%;
-    --popover-foreground: 222 47% 11%;
+    --popover-foreground: 240 10% 3.9%;
 
-    /* Canva蓝色 */
-    --primary: 196 100% 47%;
+    /* 优雅的蓝色 */
+    --primary: 221 83% 53%;
     --primary-foreground: 0 0% 100%;
 
-    /* 浅灰色 */
-    --secondary: 210 20% 96%;
-    --secondary-foreground: 222 47% 11%;
+    /* 柔和的灰色 */
+    --secondary: 240 4.8% 95.9%;
+    --secondary-foreground: 240 5.9% 10%;
 
     /* 中性灰 */
-    --muted: 210 20% 96%;
-    --muted-foreground: 215 16% 47%;
+    --muted: 240 4.8% 95.9%;
+    --muted-foreground: 240 3.8% 46.1%;
 
-    /* 紫色强调 */
-    --accent: 262 83% 58%;
+    /* 柔和的紫色 */
+    --accent: 262 60% 60%;
     --accent-foreground: 0 0% 100%;
 
-    /* 红色警告 */
-    --destructive: 0 84% 60%;
+    /* 警告红 */
+    --destructive: 0 72% 51%;
     --destructive-foreground: 0 0% 100%;
 
-    --border: 214 32% 91%;
-    --input: 214 32% 91%;
-    --ring: 196 100% 47%;
+    --border: 240 5.9% 90%;
+    --input: 240 5.9% 90%;
+    --ring: 221 83% 53%;
 
-    --radius: 0.75rem;
+    --radius: 0.5rem;
   }
 
   .dark {
-    /* Canva风格的暗色主题 */
-    --background: 222 47% 11%;
-    --foreground: 210 40% 98%;
+    /* 优雅的暗色主题 */
+    --background: 240 10% 3.9%;
+    --foreground: 0 0% 98%;
 
-    --card: 222 47% 11%;
-    --card-foreground: 210 40% 98%;
+    --card: 240 10% 3.9%;
+    --card-foreground: 0 0% 98%;
 
-    --popover: 222 47% 11%;
-    --popover-foreground: 210 40% 98%;
+    --popover: 240 10% 3.9%;
+    --popover-foreground: 0 0% 98%;
 
     /* 亮蓝色 */
-    --primary: 196 100% 50%;
+    --primary: 217 91% 60%;
     --primary-foreground: 0 0% 100%;
 
     /* 深灰色 */
-    --secondary: 217 33% 17%;
-    --secondary-foreground: 210 40% 98%;
+    --secondary: 240 3.7% 15.9%;
+    --secondary-foreground: 0 0% 98%;
 
     /* 暗灰色 */
-    --muted: 217 33% 17%;
-    --muted-foreground: 215 20% 65%;
+    --muted: 240 3.7% 15.9%;
+    --muted-foreground: 240 5% 64.9%;
 
     /* 亮紫色 */
-    --accent: 262 83% 65%;
+    --accent: 262 60% 65%;
     --accent-foreground: 0 0% 100%;
 
     /* 亮红色 */
-    --destructive: 0 84% 65%;
+    --destructive: 0 62.8% 60.6%;
     --destructive-foreground: 0 0% 100%;
 
-    --border: 217 33% 17%;
-    --input: 217 33% 17%;
-    --ring: 196 100% 50%;
+    --border: 240 3.7% 15.9%;
+    --input: 240 3.7% 15.9%;
+    --ring: 217 91% 60%;
   }
 }
 
@@ -84,5 +84,6 @@
   }
   body {
     @apply bg-[hsl(var(--background))] text-[hsl(var(--foreground))];
+    font-feature-settings: "rlig" 1, "calt" 1;
   }
 } 
