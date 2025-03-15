@@ -1,5 +1,6 @@
 use crate::tools::base::{ToolError, ToolResult};
 use base64::{engine::general_purpose, Engine as _};
+use log::{debug, error, info, warn};
 use serde::{Deserialize, Serialize};
 use std::{
     env,
@@ -98,11 +99,17 @@ pub struct ComputerTool {
 impl ComputerTool {
     /// 创建一个新的计算机控制工具实例
     pub fn new() -> Result<Self, ToolError> {
+        info!("初始化计算机控制工具");
         // 尝试从环境变量获取宽度和高度
         let width = match env::var("WIDTH") {
-            Ok(w) => w.parse::<u32>()
-                .map_err(|_| ToolError::new("WIDTH环境变量不是有效的数字"))?,
+            Ok(w) => {
+                let width = w.parse::<u32>()
+                    .map_err(|_| ToolError::new("WIDTH环境变量不是有效的数字"))?;
+                info!("从环境变量获取屏幕宽度: {}", width);
+                width
+            },
             Err(_) => {
+                debug!("未设置WIDTH环境变量，尝试获取系统屏幕尺寸");
                 // 尝试获取系统屏幕尺寸
                 #[cfg(target_os = "macos")]
                 {
@@ -220,6 +227,8 @@ impl ComputerTool {
 
         let xdotool = format!("{}xdotool", display_prefix);
 
+        info!("计算机控制工具初始化完成，屏幕尺寸: {}x{}", width, height);
+        
         Ok(Self {
             width,
             height,
@@ -233,6 +242,7 @@ impl ComputerTool {
     /// 获取工具配置选项
     pub fn options(&self) -> serde_json::Value {
         let (width, height) = self.scale_coordinates(ScalingSource::Computer, self.width, self.height);
+        debug!("获取计算机工具配置: 宽度={}, 高度={}, 显示器编号={:?}", width, height, self.display_num);
         serde_json::json!({
             "display_width_px": width,
             "display_height_px": height,
@@ -251,6 +261,9 @@ impl ComputerTool {
         duration: Option<f32>,
         key: Option<String>,
     ) -> Result<ToolResult, ToolError> {
+        info!("执行计算机控制操作: {:?}, 坐标={:?}, 文本={:?}, 按键={:?}", 
+            action, coordinate, text, key);
+        
         match action {
             ComputerAction::MouseMove | ComputerAction::LeftClickDrag => {
                 let coordinate = coordinate.ok_or_else(|| ToolError::new(format!("coordinate is required for {:?}", action)))?;
@@ -348,8 +361,12 @@ impl ComputerTool {
 
                 self.shell(&command_parts.join(" "), true).await
             }
-            ComputerAction::Screenshot => self.take_screenshot().await,
+            ComputerAction::Screenshot => {
+                info!("执行截图操作");
+                self.take_screenshot().await
+            }
             ComputerAction::CursorPosition => {
+                info!("获取光标位置");
                 let command = format!("{} getmouselocation --shell", self.xdotool);
                 let result = self.shell(&command, false).await?;
                 
@@ -442,6 +459,7 @@ impl ComputerTool {
                 self.shell(&command, true).await
             }
             ComputerAction::Wait => {
+                info!("等待操作: {}秒", duration.unwrap_or(0.0));
                 let duration = duration.ok_or_else(|| 
                     ToolError::new("duration is required for wait action"))?;
                 
@@ -463,30 +481,47 @@ impl ComputerTool {
     /// 验证并获取坐标
     fn validate_and_get_coordinates(&self, coordinate: (i32, i32)) -> Result<(u32, u32), ToolError> {
         let (x, y) = coordinate;
+        debug!("验证坐标: ({}, {})", x, y);
         
         // 更严格的坐标验证，与Python版本保持一致
         if x < 0 || y < 0 {
-            return Err(ToolError::new(format!("{:?} must be a tuple of non-negative ints", coordinate)));
+            let err_msg = format!("{:?} must be a tuple of non-negative ints", coordinate);
+            error!("坐标验证失败: {}", err_msg);
+            return Err(ToolError::new(err_msg));
         }
         
         // 检查坐标是否超出屏幕范围
         if x as u32 > self.width || y as u32 > self.height {
-            return Err(ToolError::new(format!("Coordinates {}, {} are out of bounds", x, y)));
+            let err_msg = format!("Coordinates {}, {} are out of bounds", x, y);
+            error!("坐标超出屏幕范围: {}", err_msg);
+            return Err(ToolError::new(err_msg));
         }
         
-        Ok(self.scale_coordinates(ScalingSource::Api, x as u32, y as u32))
+        let scaled = self.scale_coordinates(ScalingSource::Api, x as u32, y as u32);
+        debug!("坐标缩放结果: ({}, {}) -> ({}, {})", x, y, scaled.0, scaled.1);
+        Ok(scaled)
     }
 
     /// 执行shell命令
     async fn shell(&self, command: &str, take_screenshot: bool) -> Result<ToolResult, ToolError> {
+        debug!("执行Shell命令: {}", command);
+        
         let output = Command::new("sh")
             .arg("-c")
             .arg(command)
             .output()
-            .map_err(|e| ToolError::new(format!("执行命令失败: {}", e)))?;
+            .map_err(|e| {
+                let err_msg = format!("执行命令失败: {}", e);
+                error!("{}", err_msg);
+                ToolError::new(err_msg)
+            })?;
         
         let stdout = String::from_utf8_lossy(&output.stdout).to_string();
         let stderr = String::from_utf8_lossy(&output.stderr).to_string();
+        
+        if !stderr.is_empty() {
+            warn!("命令执行产生错误: {}", stderr);
+        }
         
         let mut result = ToolResult {
             output: if stdout.is_empty() { None } else { Some(stdout) },
@@ -496,10 +531,12 @@ impl ComputerTool {
         };
         
         if take_screenshot {
+            debug!("命令执行后需要截图，等待{}秒", SCREENSHOT_DELAY);
             // 延迟一段时间，让界面稳定下来，与Python版本保持一致
             tokio::time::sleep(Duration::from_secs_f32(SCREENSHOT_DELAY)).await;
             
             // 获取截图，使用Box::pin来避免无限大的Future
+            info!("执行截图");
             let screenshot_future = Box::pin(self.take_screenshot());
             let screenshot_result = screenshot_future.await?;
             result.base64_image = screenshot_result.base64_image;
@@ -510,14 +547,22 @@ impl ComputerTool {
 
     /// 截取屏幕截图 - 重命名为 take_screenshot 以避免递归
     async fn take_screenshot(&self) -> Result<ToolResult, ToolError> {
+        info!("开始截取屏幕截图");
+        
         let output_dir = Path::new(OUTPUT_DIR);
         if !output_dir.exists() {
-            fs::create_dir_all(output_dir).map_err(|e| ToolError::new(format!("创建输出目录失败: {}", e)))?;
+            debug!("创建输出目录: {}", OUTPUT_DIR);
+            fs::create_dir_all(output_dir).map_err(|e| {
+                let err_msg = format!("创建输出目录失败: {}", e);
+                error!("{}", err_msg);
+                ToolError::new(err_msg)
+            })?;
         }
         
         // 使用UUID生成唯一文件名，与Python版本保持一致
         let filename = format!("screenshot_{}.png", Uuid::new_v4().to_string());
-        let path = output_dir.join(filename);
+        let path = output_dir.join(&filename);
+        debug!("截图文件路径: {}", path.display());
         
         // 根据操作系统选择不同的截图命令
         let screenshot_cmd = if cfg!(target_os = "macos") {
@@ -533,12 +578,15 @@ impl ComputerTool {
                 .unwrap_or(false);
             
             if has_gnome_screenshot {
+                debug!("使用gnome-screenshot进行截图");
                 format!("{}gnome-screenshot -f {} -p", self.display_prefix, path.display())
             } else {
+                debug!("使用scrot进行截图");
                 format!("{}scrot -p {}", self.display_prefix, path.display())
             }
         } else if cfg!(target_os = "windows") {
             // Windows可以使用PowerShell的截图功能
+            debug!("使用PowerShell进行截图");
             format!(
                 "powershell -command \"Add-Type -AssemblyName System.Windows.Forms; \
                 [System.Windows.Forms.SendKeys]::SendWait('%{{PRTSC}}'); \
@@ -547,26 +595,41 @@ impl ComputerTool {
                 path.display()
             )
         } else {
-            return Err(ToolError::new("不支持的操作系统"));
+            let err_msg = "不支持的操作系统";
+            error!("{}", err_msg);
+            return Err(ToolError::new(err_msg));
         };
         
         // 执行截图命令
+        debug!("执行截图命令: {}", screenshot_cmd);
         let result = self.shell(&screenshot_cmd, false).await?;
         
         // 如果启用了缩放，则调整图像大小
         if self.scaling_enabled {
             let (x, y) = self.scale_coordinates(ScalingSource::Computer, self.width, self.height);
+            debug!("调整截图大小为: {}x{}", x, y);
             let convert_cmd = format!("convert {} -resize {}x{}! {}", path.display(), x, y, path.display());
             self.shell(&convert_cmd, false).await?;
         }
         
         // 检查文件是否存在并读取
         if path.exists() {
-            let mut file = File::open(&path).map_err(|e| ToolError::new(format!("无法打开截图文件: {}", e)))?;
+            debug!("截图文件已创建: {}", path.display());
+            let mut file = File::open(&path).map_err(|e| {
+                let err_msg = format!("无法打开截图文件: {}", e);
+                error!("{}", err_msg);
+                ToolError::new(err_msg)
+            })?;
+            
             let mut buffer = Vec::new();
-            file.read_to_end(&mut buffer).map_err(|e| ToolError::new(format!("无法读取截图文件: {}", e)))?;
+            file.read_to_end(&mut buffer).map_err(|e| {
+                let err_msg = format!("无法读取截图文件: {}", e);
+                error!("{}", err_msg);
+                ToolError::new(err_msg)
+            })?;
             
             let base64_image = general_purpose::STANDARD.encode(&buffer);
+            info!("截图完成，图像大小: {} 字节", buffer.len());
             
             Ok(ToolResult {
                 output: None,
@@ -575,7 +638,9 @@ impl ComputerTool {
                 system: None,
             })
         } else {
-            Err(ToolError::new(format!("截图失败: {:?}", result.error)))
+            let err_msg = format!("截图失败: {:?}", result.error);
+            error!("{}", err_msg);
+            Err(ToolError::new(err_msg))
         }
     }
 
