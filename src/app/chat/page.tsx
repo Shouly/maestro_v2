@@ -1,16 +1,16 @@
 "use client";
 
-import React, { useState, useEffect, useRef } from 'react';
-import { Settings, Sparkles, MessageSquare, Menu, X, PanelLeft, Plus } from 'lucide-react';
-import { v4 as uuidv4 } from 'uuid';
-import { Navbar } from '@/components/layout/Navbar';
+import { Button } from '@/components/ui/Button';
 import { ChatInput } from '@/components/ui/ChatInput';
 import { ChatMessage, MessageRole } from '@/components/ui/ChatMessage';
-import { ChatSessionList, ChatSession } from '@/components/ui/ChatSessionList';
+import { ChatSession, ChatSessionList } from '@/components/ui/ChatSessionList';
+import { MainNavigation } from '@/components/ui/MainNavigation';
+import { MobileNavigation } from '@/components/ui/MobileNavigation';
+import { SettingsData, SettingsPanel } from '@/components/ui/SettingsPanel';
 import { ToolOutput } from '@/components/ui/ToolOutput';
-import { SettingsPanel, SettingsData } from '@/components/ui/SettingsPanel';
-import { Button } from '@/components/ui/Button';
-import { cn } from '@/lib/utils';
+import { Menu, MessageSquare, Plus, Sparkles } from 'lucide-react';
+import { useEffect, useRef, useState } from 'react';
+import { v4 as uuidv4 } from 'uuid';
 
 // 消息类型
 interface Message {
@@ -61,10 +61,10 @@ export default function ChatPage() {
         isActive: true,
       }
     ];
-    
+
     setSessions(demoSessions);
     setCurrentSessionId('1');
-    
+
     // 添加欢迎消息
     setMessages([
       {
@@ -86,7 +86,7 @@ export default function ChatPage() {
   // 处理发送消息
   const handleSendMessage = (content: string) => {
     if (!content.trim()) return;
-    
+
     // 添加用户消息
     const userMessage: Message = {
       id: uuidv4(),
@@ -94,12 +94,12 @@ export default function ChatPage() {
       content,
       timestamp: new Date(),
     };
-    
+
     setMessages(prev => [...prev, userMessage]);
-    
+
     // 模拟 AI 响应
     setIsLoading(true);
-    
+
     // 这里应该调用 API
     setTimeout(() => {
       const assistantMessage: Message = {
@@ -108,9 +108,9 @@ export default function ChatPage() {
         content: '我收到了你的消息。这是一个示例响应，实际应用中会调用 Claude API 获取回复。',
         timestamp: new Date(),
       };
-      
+
       setMessages(prev => [...prev, assistantMessage]);
-      
+
       // 模拟工具输出
       const toolOutput: Tool = {
         id: uuidv4(),
@@ -119,16 +119,16 @@ export default function ChatPage() {
         content: '这是一个示例工具输出。在实际应用中，这里会显示工具执行的结果。',
         timestamp: new Date(),
       };
-      
+
       setTools(prev => [...prev, toolOutput]);
       setIsLoading(false);
-      
+
       // 更新会话列表
       if (currentSessionId) {
-        setSessions(prev => 
-          prev.map(session => 
-            session.id === currentSessionId 
-              ? { ...session, lastMessage: content } 
+        setSessions(prev =>
+          prev.map(session =>
+            session.id === currentSessionId
+              ? { ...session, lastMessage: content }
               : session
           )
         );
@@ -144,7 +144,7 @@ export default function ChatPage() {
       timestamp: new Date(),
       isActive: true,
     };
-    
+
     setSessions(prev => prev.map(s => ({ ...s, isActive: false })).concat([newSession]));
     setCurrentSessionId(newSession.id);
     setMessages([]);
@@ -155,13 +155,13 @@ export default function ChatPage() {
   // 选择会话
   const handleSelectSession = (sessionId: string) => {
     setCurrentSessionId(sessionId);
-    setSessions(prev => 
+    setSessions(prev =>
       prev.map(session => ({
         ...session,
         isActive: session.id === sessionId,
       }))
     );
-    
+
     // 这里应该加载选定会话的消息
     // 示例
     if (sessionId === '1') {
@@ -178,20 +178,20 @@ export default function ChatPage() {
       setMessages([]);
       setTools([]);
     }
-    
+
     setSidebarOpen(false); // 移动端选择会话后关闭侧边栏
   };
 
   // 删除会话
   const handleDeleteSession = (sessionId: string) => {
     setSessions(prev => prev.filter(session => session.id !== sessionId));
-    
+
     if (currentSessionId === sessionId) {
       const remainingSessions = sessions.filter(session => session.id !== sessionId);
       if (remainingSessions.length > 0) {
         setCurrentSessionId(remainingSessions[0].id);
-        setSessions(prev => 
-          prev.map((session, index) => 
+        setSessions(prev =>
+          prev.map((session, index) =>
             index === 0 ? { ...session, isActive: true } : session
           ).filter(session => session.id !== sessionId)
         );
@@ -203,10 +203,10 @@ export default function ChatPage() {
 
   // 重命名会话
   const handleRenameSession = (sessionId: string, newTitle: string) => {
-    setSessions(prev => 
-      prev.map(session => 
-        session.id === sessionId 
-          ? { ...session, title: newTitle } 
+    setSessions(prev =>
+      prev.map(session =>
+        session.id === sessionId
+          ? { ...session, title: newTitle }
           : session
       )
     );
@@ -231,186 +231,190 @@ export default function ChatPage() {
 
   return (
     <div className="flex flex-col h-screen bg-[hsl(var(--background))]">
-      {/* 导航栏 */}
-      <Navbar className="border-b shadow-sm" />
-      
       {/* 主内容区 */}
       <div className="flex flex-1 overflow-hidden relative">
-        {/* 左侧会话列表 - 桌面版 */}
-        <div className={cn(
-          "w-72 border-r p-4 bg-[hsl(var(--secondary))] hidden md:block",
-          "transition-all duration-300 ease-in-out"
-        )}>
-          <ChatSessionList
-            sessions={sessions}
-            onSelectSession={handleSelectSession}
-            onCreateSession={handleCreateSession}
-            onDeleteSession={handleDeleteSession}
-            onRenameSession={handleRenameSession}
-            onExportSession={handleExportSession}
-          />
-        </div>
-        
-        {/* 左侧会话列表 - 移动版 */}
-        <div className={cn(
-          "fixed inset-0 z-40 w-72 border-r p-4 bg-[hsl(var(--secondary))] md:hidden",
-          "transform transition-transform duration-300 ease-in-out",
-          sidebarOpen ? "translate-x-0" : "-translate-x-full"
-        )}>
-          <div className="flex justify-between items-center mb-4">
-            <h2 className="text-lg font-semibold flex items-center">
-              <MessageSquare className="w-5 h-5 mr-2" />
-              会话列表
-            </h2>
-            <button 
-              onClick={toggleSidebar}
-              className="p-1 rounded-full hover:bg-[hsl(var(--accent))]"
-              aria-label="关闭侧边栏"
-            >
-              <X className="w-5 h-5" />
-            </button>
-          </div>
-          <ChatSessionList
-            sessions={sessions}
-            onSelectSession={handleSelectSession}
-            onCreateSession={handleCreateSession}
-            onDeleteSession={handleDeleteSession}
-            onRenameSession={handleRenameSession}
-            onExportSession={handleExportSession}
-          />
-        </div>
-        
+        {/* 左侧主导航菜单 - 桌面版 */}
+        <MainNavigation
+          currentPath="/chat"
+          onOpenSettings={() => setSettingsOpen(true)}
+        />
+
+        {/* 左侧主导航菜单 - 移动版 */}
+        <MobileNavigation
+          isOpen={sidebarOpen}
+          onClose={() => setSidebarOpen(false)}
+          currentPath="/chat"
+          onOpenSettings={() => {
+            setSettingsOpen(true);
+            setSidebarOpen(false);
+          }}
+        />
+
         {/* 侧边栏背景遮罩 */}
         {sidebarOpen && (
-          <div 
+          <div
             className="fixed inset-0 z-30 bg-black/50 md:hidden"
             onClick={toggleSidebar}
           />
         )}
-        
-        {/* 右侧对话区域 */}
-        <div className="flex-1 flex flex-col overflow-hidden relative">
-          {/* 对话标题栏 */}
-          <div className="flex items-center justify-between px-6 py-3 border-b bg-[hsl(var(--background))] shadow-sm">
-            <div className="flex items-center">
-              {/* 移动端侧边栏按钮 */}
-              <button
-                className="mr-3 p-1 rounded-md hover:bg-[hsl(var(--accent))] md:hidden"
-                onClick={toggleSidebar}
-                aria-label="打开侧边栏"
-              >
-                <PanelLeft className="w-5 h-5" />
-              </button>
-              
-              <h1 className="text-lg font-semibold">
-                {currentSessionId 
-                  ? sessions.find(s => s.id === currentSessionId)?.title || '对话' 
-                  : '对话'}
-              </h1>
-            </div>
-            
-            <div className="flex items-center space-x-2">
-              {/* 移动端新建会话按钮 */}
+
+        {/* 右侧内容区 */}
+        <div className="flex-1 flex overflow-hidden">
+          {/* 会话列表区域 */}
+          <div className="w-64 border-r bg-[hsl(var(--card))] hidden md:flex md:flex-col">
+            <div className="p-4 border-b flex justify-between items-center">
+              <h2 className="text-sm font-semibold flex items-center">
+                <MessageSquare className="w-4 h-4 mr-2" />
+                会话列表
+              </h2>
               <Button
                 variant="ghost"
                 size="icon"
                 onClick={handleCreateSession}
-                className="md:hidden"
-                aria-label="新建会话"
+                className="h-7 w-7"
               >
-                <Plus className="w-5 h-5" />
-              </Button>
-              
-              <Button
-                variant="ghost"
-                size="icon"
-                onClick={() => setSettingsOpen(true)}
-                aria-label="设置"
-              >
-                <Settings className="w-5 h-5" />
+                <Plus className="w-4 h-4" />
               </Button>
             </div>
+
+            <div className="flex-1 overflow-y-auto p-3">
+              <ChatSessionList
+                sessions={sessions}
+                onSelectSession={handleSelectSession}
+                onCreateSession={handleCreateSession}
+                onDeleteSession={handleDeleteSession}
+                onRenameSession={handleRenameSession}
+                onExportSession={handleExportSession}
+              />
+            </div>
           </div>
-          
-          {/* 消息列表 */}
-          <div className="flex-1 overflow-y-auto p-4 md:p-6 bg-[hsl(var(--background))]">
-            {messages.length === 0 && tools.length === 0 ? (
-              <div className="h-full flex flex-col items-center justify-center text-center p-8">
-                <div className="w-16 h-16 rounded-full bg-[hsl(var(--primary))/10] flex items-center justify-center mb-4">
-                  <Sparkles className="w-8 h-8 text-[hsl(var(--primary))]" />
-                </div>
-                <h2 className="text-2xl font-bold mb-2">欢迎使用 Maestro</h2>
-                <p className="text-[hsl(var(--muted-foreground))] max-w-md mb-8">
-                  我是您的 AI 助手，可以帮助您控制计算机、执行命令和编辑文件。请告诉我您需要什么帮助？
-                </p>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-3 w-full max-w-lg">
-                  <div className="p-3 border rounded-lg hover:bg-[hsl(var(--accent))] cursor-pointer transition-colors">
-                    "截取当前屏幕并分析内容"
-                  </div>
-                  <div className="p-3 border rounded-lg hover:bg-[hsl(var(--accent))] cursor-pointer transition-colors">
-                    "帮我整理桌面文件"
-                  </div>
-                  <div className="p-3 border rounded-lg hover:bg-[hsl(var(--accent))] cursor-pointer transition-colors">
-                    "查找并删除重复文件"
-                  </div>
-                  <div className="p-3 border rounded-lg hover:bg-[hsl(var(--accent))] cursor-pointer transition-colors">
-                    "帮我编写一个简单的脚本"
-                  </div>
-                </div>
+
+          {/* 对话内容区域 */}
+          <div className="flex-1 flex flex-col overflow-hidden">
+            {/* 对话标题栏 */}
+            <div className="flex items-center justify-between px-4 py-3 border-b bg-[hsl(var(--background))] shadow-sm">
+              <div className="flex items-center">
+                {/* 移动端侧边栏按钮 */}
+                <button
+                  className="mr-3 p-1 rounded-md hover:bg-[hsl(var(--accent))] md:hidden"
+                  onClick={toggleSidebar}
+                  aria-label="打开侧边栏"
+                >
+                  <Menu className="w-5 h-5" />
+                </button>
+
+                <h1 className="text-lg font-semibold">
+                  {currentSessionId
+                    ? sessions.find(s => s.id === currentSessionId)?.title || '对话'
+                    : '对话'}
+                </h1>
               </div>
-            ) : (
-              <>
-                {messages.map(message => (
-                  <ChatMessage
-                    key={message.id}
-                    role={message.role}
-                    content={message.content}
-                    timestamp={message.timestamp}
-                  />
-                ))}
-                
-                {isLoading && (
-                  <ChatMessage
-                    role="assistant"
-                    content=""
-                    isLoading={true}
-                  />
-                )}
-                
-                {/* 工具输出 */}
-                {tools.map(tool => (
-                  <ToolOutput
-                    key={tool.id}
-                    type={tool.type}
-                    title={tool.title}
-                    content={tool.content}
-                    timestamp={tool.timestamp}
-                  />
-                ))}
-                
-                {/* 用于自动滚动的空div */}
-                <div ref={messagesEndRef} />
-              </>
-            )}
-          </div>
-          
-          {/* 输入区域 */}
-          <div className="p-4 border-t bg-[hsl(var(--background))] shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.05)]">
-            <ChatInput
-              onSend={handleSendMessage}
-              isLoading={isLoading}
-              placeholder="输入消息或指令..."
-            />
-            <div className="flex justify-center mt-2">
-              <span className="text-xs text-[hsl(var(--muted-foreground))] flex items-center">
-                <Sparkles className="w-3 h-3 mr-1" />
-                由 Claude AI 提供支持
-              </span>
+
+              {/* 移动端快捷操作 */}
+              <div className="flex items-center space-x-2">
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={handleCreateSession}
+                  className="h-8 w-8 md:hidden"
+                  aria-label="新建会话"
+                >
+                  <Plus className="w-4 h-4" />
+                </Button>
+
+                {/* 会话列表切换按钮 - 仅在中等屏幕上显示 */}
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => {/* 这里应该添加切换会话列表的逻辑 */ }}
+                  className="hidden md:flex items-center"
+                >
+                  <MessageSquare className="w-4 h-4 mr-1.5" />
+                  <span>会话</span>
+                </Button>
+              </div>
+            </div>
+
+            {/* 消息列表 */}
+            <div className="flex-1 overflow-y-auto p-4 md:p-6 bg-[hsl(var(--background))]">
+              {messages.length === 0 && tools.length === 0 ? (
+                <div className="h-full flex flex-col items-center justify-center text-center p-8">
+                  <div className="w-16 h-16 rounded-full bg-[hsl(var(--primary))/10] flex items-center justify-center mb-4">
+                    <Sparkles className="w-8 h-8 text-[hsl(var(--primary))]" />
+                  </div>
+                  <h2 className="text-2xl font-bold mb-2">欢迎使用 Maestro</h2>
+                  <p className="text-[hsl(var(--muted-foreground))] max-w-md mb-8">
+                    我是您的 AI 助手，可以帮助您控制计算机、执行命令和编辑文件。请告诉我您需要什么帮助？
+                  </p>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3 w-full max-w-lg">
+                    <div className="p-3 border rounded-lg hover:bg-[hsl(var(--accent))] cursor-pointer transition-colors">
+                      "截取当前屏幕并分析内容"
+                    </div>
+                    <div className="p-3 border rounded-lg hover:bg-[hsl(var(--accent))] cursor-pointer transition-colors">
+                      "帮我整理桌面文件"
+                    </div>
+                    <div className="p-3 border rounded-lg hover:bg-[hsl(var(--accent))] cursor-pointer transition-colors">
+                      "查找并删除重复文件"
+                    </div>
+                    <div className="p-3 border rounded-lg hover:bg-[hsl(var(--accent))] cursor-pointer transition-colors">
+                      "帮我编写一个简单的脚本"
+                    </div>
+                  </div>
+                </div>
+              ) : (
+                <>
+                  {messages.map(message => (
+                    <ChatMessage
+                      key={message.id}
+                      role={message.role}
+                      content={message.content}
+                      timestamp={message.timestamp}
+                    />
+                  ))}
+
+                  {isLoading && (
+                    <ChatMessage
+                      role="assistant"
+                      content=""
+                      isLoading={true}
+                    />
+                  )}
+
+                  {/* 工具输出 */}
+                  {tools.map(tool => (
+                    <ToolOutput
+                      key={tool.id}
+                      type={tool.type}
+                      title={tool.title}
+                      content={tool.content}
+                      timestamp={tool.timestamp}
+                    />
+                  ))}
+
+                  {/* 用于自动滚动的空div */}
+                  <div ref={messagesEndRef} />
+                </>
+              )}
+            </div>
+
+            {/* 输入区域 */}
+            <div className="p-4 border-t bg-[hsl(var(--background))] shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.05)]">
+              <ChatInput
+                onSend={handleSendMessage}
+                isLoading={isLoading}
+                placeholder="输入消息或指令..."
+              />
+              <div className="flex justify-center mt-2">
+                <span className="text-xs text-[hsl(var(--muted-foreground))] flex items-center">
+                  <Sparkles className="w-3 h-3 mr-1" />
+                  由 Claude AI 提供支持
+                </span>
+              </div>
             </div>
           </div>
         </div>
       </div>
-      
+
       {/* 设置面板 */}
       <SettingsPanel
         isOpen={settingsOpen}
