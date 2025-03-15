@@ -308,7 +308,8 @@ export default function ChatPage() {
         
         // 如果有图片，添加图片标记
         if (result.base64_image) {
-          appendContent += '\n\n**截图结果**\n![截图](data:image/png;base64,' + result.base64_image + ')';
+          // 使用HTML img标签而不是Markdown语法，以确保Base64图片能正确显示
+          appendContent += `\n\n**截图结果**\n<img src="data:image/png;base64,${result.base64_image}" alt="截图" style="max-width:100%; border-radius:4px; border:1px solid #ddd;" />`;
         }
         
         setMessages(prev => 

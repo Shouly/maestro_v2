@@ -2,6 +2,7 @@ import React from 'react';
 import { User, Bot, Loader2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import ReactMarkdown from 'react-markdown';
+import rehypeRaw from 'rehype-raw';
 
 export type MessageRole = 'user' | 'assistant' | 'system';
 export type ToolType = 'command' | 'screenshot' | 'code' | 'file' | 'success' | 'error' | 'info';
@@ -37,6 +38,33 @@ export const EnhancedChatMessage: React.FC<EnhancedChatMessageProps> = ({
     hour: '2-digit',
     minute: '2-digit',
   }).format(timestamp) : '';
+
+  // 自定义组件，特别处理图片
+  const components = {
+    img: ({ src, alt, ...props }: React.ImgHTMLAttributes<HTMLImageElement>) => (
+      <div className="my-2 overflow-hidden rounded-md border border-[hsl(var(--border))]">
+        <img 
+          src={src} 
+          alt={alt || "图片"} 
+          className="max-w-full h-auto" 
+          {...props} 
+        />
+      </div>
+    ),
+    // 自定义代码块样式
+    code: ({ className, children, ...props }: React.HTMLAttributes<HTMLElement>) => {
+      return (
+        <code className="px-1 py-0.5 bg-[hsl(var(--muted))] rounded text-xs" {...props}>
+          {children}
+        </code>
+      );
+    },
+    pre: ({ children, ...props }: React.HTMLAttributes<HTMLPreElement>) => (
+      <pre className="my-2 p-2 overflow-auto rounded-md bg-[hsl(var(--muted))] text-xs font-mono" {...props}>
+        {children}
+      </pre>
+    ),
+  };
 
   return (
     <div className={cn(
@@ -86,7 +114,10 @@ export const EnhancedChatMessage: React.FC<EnhancedChatMessageProps> = ({
                     content
                   ) : (
                     // AI消息使用Markdown渲染
-                    <ReactMarkdown>
+                    <ReactMarkdown 
+                      components={components}
+                      rehypePlugins={[rehypeRaw]} // 允许渲染HTML
+                    >
                       {content}
                     </ReactMarkdown>
                   )}
