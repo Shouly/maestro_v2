@@ -13,8 +13,10 @@
     "windows": [
       {
         "title": "Maestro",
-        "width": 1024,
-        "height": 768,
+        "width": 1280,
+        "height": 800,
+        "minWidth": 800,
+        "minHeight": 600,
         "resizable": true,
         "fullscreen": false,
         "center": true,
