@@ -155,11 +155,11 @@
   }
 }
 
-/* 使用 Tailwind 配置中定义的动画 */
+/* 自定义动画类 */
 .animate-float {
-  @apply animate-float;
+  animation: float 4s ease-in-out infinite;
 }
 
 .animate-pulse-slow {
-  @apply animate-pulse-slow;
+  animation: pulse-slow 3s ease-in-out infinite;
 } 
