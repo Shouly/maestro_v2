@@ -1,10 +1,8 @@
 "use client";
 
-import React from 'react';
-import Link from 'next/link';
-import { ArrowLeft, MessageSquare, Settings, Command, Home } from 'lucide-react';
-import { Button } from '@/components/ui/Button';
 import { cn } from '@/lib/utils';
+import { Command, Home, MessageSquare, Settings } from 'lucide-react';
+import Link from 'next/link';
 
 interface MainNavigationProps {
   currentPath: string;
@@ -25,43 +23,43 @@ export function MainNavigation({ currentPath, onOpenSettings }: MainNavigationPr
           </div>
         </Link>
       </div>
-      
+
       {/* 主导航菜单 */}
       <div className="flex-1 w-full py-6 flex flex-col items-center">
         <nav className="flex flex-col items-center space-y-6 w-full">
           <Link href="/" className="w-full flex justify-center">
             <div className="group relative flex items-center justify-center">
-              <div 
+              <div
                 className={cn(
                   "w-10 h-10 rounded-xl flex justify-center items-center transition-all",
-                  currentPath === "/" 
-                    ? "bg-[hsl(var(--primary))] text-[hsl(var(--primary-foreground))]" 
+                  currentPath === "/"
+                    ? "bg-[hsl(var(--primary))] text-[hsl(var(--primary-foreground))]"
                     : "text-[hsl(var(--muted-foreground))] hover:text-[hsl(var(--foreground))] hover:bg-[hsl(var(--secondary))]"
                 )}
               >
                 <Home className="w-5 h-5" />
               </div>
-              
+
               {/* 悬停提示 */}
               <div className="absolute left-full ml-2 px-2 py-1 bg-[hsl(var(--popover))] rounded-md text-xs font-medium opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-opacity shadow-md whitespace-nowrap z-50">
                 首页
               </div>
             </div>
           </Link>
-          
+
           <Link href="/chat" className="w-full flex justify-center">
             <div className="group relative flex items-center justify-center">
-              <div 
+              <div
                 className={cn(
                   "w-10 h-10 rounded-xl flex justify-center items-center transition-all",
-                  currentPath === "/chat" 
-                    ? "bg-[hsl(var(--primary))] text-[hsl(var(--primary-foreground))]" 
+                  currentPath === "/chat"
+                    ? "bg-[hsl(var(--primary))] text-[hsl(var(--primary-foreground))]"
                     : "text-[hsl(var(--muted-foreground))] hover:text-[hsl(var(--foreground))] hover:bg-[hsl(var(--secondary))]"
                 )}
               >
                 <MessageSquare className="w-5 h-5" />
               </div>
-              
+
               {/* 悬停提示 */}
               <div className="absolute left-full ml-2 px-2 py-1 bg-[hsl(var(--popover))] rounded-md text-xs font-medium opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-opacity shadow-md whitespace-nowrap z-50">
                 对话
@@ -70,17 +68,17 @@ export function MainNavigation({ currentPath, onOpenSettings }: MainNavigationPr
           </Link>
         </nav>
       </div>
-      
+
       {/* 底部设置按钮 */}
       <div className="w-full py-6 flex justify-center border-t">
-        <div 
+        <div
           className="group relative flex items-center justify-center cursor-pointer"
           onClick={onOpenSettings}
         >
           <div className="w-10 h-10 rounded-xl flex justify-center items-center text-[hsl(var(--muted-foreground))] hover:text-[hsl(var(--foreground))] hover:bg-[hsl(var(--secondary))] transition-all">
             <Settings className="w-5 h-5" />
           </div>
-          
+
           {/* 悬停提示 */}
           <div className="absolute left-full ml-2 px-2 py-1 bg-[hsl(var(--popover))] rounded-md text-xs font-medium opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-opacity shadow-md whitespace-nowrap z-50">
             设置

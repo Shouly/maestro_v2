@@ -1,10 +1,8 @@
 "use client";
 
-import React from 'react';
-import Link from 'next/link';
-import { Home, MessageSquare, Settings, Command, X } from 'lucide-react';
-import { Button } from '@/components/ui/Button';
 import { cn } from '@/lib/utils';
+import { Command, Home, MessageSquare, Settings, X } from 'lucide-react';
+import Link from 'next/link';
 
 interface MobileNavigationProps {
   isOpen: boolean;
@@ -13,11 +11,11 @@ interface MobileNavigationProps {
   onOpenSettings: () => void;
 }
 
-export function MobileNavigation({ 
-  isOpen, 
-  onClose, 
-  currentPath, 
-  onOpenSettings 
+export function MobileNavigation({
+  isOpen,
+  onClose,
+  currentPath,
+  onOpenSettings
 }: MobileNavigationProps) {
   return (
     <div className={cn(
@@ -33,7 +31,7 @@ export function MobileNavigation({
           </div>
           <span className="font-semibold text-lg">Maestro</span>
         </Link>
-        <button 
+        <button
           onClick={onClose}
           className="p-2 rounded-full hover:bg-[hsl(var(--secondary))] transition-colors"
           aria-label="关闭侧边栏"
@@ -41,16 +39,16 @@ export function MobileNavigation({
           <X className="w-5 h-5" />
         </button>
       </div>
-      
+
       {/* 主导航菜单 - 移动版 */}
       <div className="p-3">
         <nav className="space-y-1">
           <Link href="/" className="block">
-            <div 
+            <div
               className={cn(
                 "flex items-center px-3 py-2.5 rounded-lg transition-colors",
-                currentPath === "/" 
-                  ? "bg-[hsl(var(--primary))] text-[hsl(var(--primary-foreground))]" 
+                currentPath === "/"
+                  ? "bg-[hsl(var(--primary))] text-[hsl(var(--primary-foreground))]"
                   : "text-[hsl(var(--foreground))] hover:bg-[hsl(var(--secondary))]"
               )}
             >
@@ -58,13 +56,13 @@ export function MobileNavigation({
               <span className="font-medium">首页</span>
             </div>
           </Link>
-          
+
           <Link href="/chat" className="block">
-            <div 
+            <div
               className={cn(
                 "flex items-center px-3 py-2.5 rounded-lg transition-colors",
-                currentPath === "/chat" 
-                  ? "bg-[hsl(var(--primary))] text-[hsl(var(--primary-foreground))]" 
+                currentPath === "/chat"
+                  ? "bg-[hsl(var(--primary))] text-[hsl(var(--primary-foreground))]"
                   : "text-[hsl(var(--foreground))] hover:bg-[hsl(var(--secondary))]"
               )}
             >
@@ -72,8 +70,8 @@ export function MobileNavigation({
               <span className="font-medium">对话</span>
             </div>
           </Link>
-          
-          <div 
+
+          <div
             className="flex items-center px-3 py-2.5 rounded-lg transition-colors text-[hsl(var(--foreground))] hover:bg-[hsl(var(--secondary))] cursor-pointer"
             onClick={() => {
               onOpenSettings();
@@ -85,7 +83,7 @@ export function MobileNavigation({
           </div>
         </nav>
       </div>
-      
+
       {/* 底部信息 */}
       <div className="absolute bottom-0 left-0 right-0 p-4 border-t bg-[hsl(var(--background))]">
         <div className="flex items-center justify-center text-xs text-[hsl(var(--muted-foreground))]">
