@@ -78,6 +78,13 @@ pub struct Resolution {
     pub height: u32,
 }
 
+// 定义目标分辨率常量，与Python版本保持一致
+const MAX_SCALING_TARGETS: [(&str, Resolution); 3] = [
+    ("XGA", Resolution { width: 1024, height: 768 }),    // 4:3
+    ("WXGA", Resolution { width: 1280, height: 800 }),   // 16:10
+    ("FWXGA", Resolution { width: 1366, height: 768 }),  // ~16:9
+];
+
 /// 计算机控制工具
 pub struct ComputerTool {
     width: u32,
@@ -415,8 +422,12 @@ impl ComputerTool {
                 let duration = duration.ok_or_else(|| 
                     ToolError::new("duration is required for hold_key action"))?;
                 
-                if duration < 0.0 || duration > 100.0 {
-                    return Err(ToolError::new(format!("duration={} must be between 0 and 100", duration)));
+                // 更严格的duration验证，与Python版本保持一致
+                if duration < 0.0 {
+                    return Err(ToolError::new(format!("duration={} must be non-negative", duration)));
+                }
+                if duration > 100.0 {
+                    return Err(ToolError::new(format!("duration={} is too long", duration)));
                 }
                 
                 let text = text.ok_or_else(|| 
@@ -434,8 +445,12 @@ impl ComputerTool {
                 let duration = duration.ok_or_else(|| 
                     ToolError::new("duration is required for wait action"))?;
                 
-                if duration < 0.0 || duration > 100.0 {
-                    return Err(ToolError::new(format!("duration={} must be between 0 and 100", duration)));
+                // 更严格的duration验证，与Python版本保持一致
+                if duration < 0.0 {
+                    return Err(ToolError::new(format!("duration={} must be non-negative", duration)));
+                }
+                if duration > 100.0 {
+                    return Err(ToolError::new(format!("duration={} is too long", duration)));
                 }
                 
                 // 使用tokio的sleep而不是标准库的sleep
@@ -449,8 +464,14 @@ impl ComputerTool {
     fn validate_and_get_coordinates(&self, coordinate: (i32, i32)) -> Result<(u32, u32), ToolError> {
         let (x, y) = coordinate;
         
+        // 更严格的坐标验证，与Python版本保持一致
         if x < 0 || y < 0 {
             return Err(ToolError::new(format!("{:?} must be a tuple of non-negative ints", coordinate)));
+        }
+        
+        // 检查坐标是否超出屏幕范围
+        if x as u32 > self.width || y as u32 > self.height {
+            return Err(ToolError::new(format!("Coordinates {}, {} are out of bounds", x, y)));
         }
         
         Ok(self.scale_coordinates(ScalingSource::Api, x as u32, y as u32))
@@ -475,12 +496,13 @@ impl ComputerTool {
         };
         
         if take_screenshot {
-            // 延迟一段时间，让界面稳定下来
+            // 延迟一段时间，让界面稳定下来，与Python版本保持一致
             tokio::time::sleep(Duration::from_secs_f32(SCREENSHOT_DELAY)).await;
-            // 使用 Box::pin 来避免无限大的 Future
+            
+            // 获取截图，使用Box::pin来避免无限大的Future
             let screenshot_future = Box::pin(self.take_screenshot());
-            let screenshot = screenshot_future.await?;
-            result.base64_image = screenshot.base64_image;
+            let screenshot_result = screenshot_future.await?;
+            result.base64_image = screenshot_result.base64_image;
         }
         
         Ok(result)
@@ -493,6 +515,7 @@ impl ComputerTool {
             fs::create_dir_all(output_dir).map_err(|e| ToolError::new(format!("创建输出目录失败: {}", e)))?;
         }
         
+        // 使用UUID生成唯一文件名，与Python版本保持一致
         let filename = format!("screenshot_{}.png", Uuid::new_v4().to_string());
         let path = output_dir.join(filename);
         
@@ -527,18 +550,17 @@ impl ComputerTool {
             return Err(ToolError::new("不支持的操作系统"));
         };
         
-        // 使用 Box::pin 来避免无限大的 Future
-        let shell_future = Box::pin(self.shell(&screenshot_cmd, false));
-        let result = shell_future.await?;
+        // 执行截图命令
+        let result = self.shell(&screenshot_cmd, false).await?;
         
+        // 如果启用了缩放，则调整图像大小
         if self.scaling_enabled {
             let (x, y) = self.scale_coordinates(ScalingSource::Computer, self.width, self.height);
             let convert_cmd = format!("convert {} -resize {}x{}! {}", path.display(), x, y, path.display());
-            // 使用 Box::pin 来避免无限大的 Future
-            let convert_future = Box::pin(self.shell(&convert_cmd, false));
-            convert_future.await?;
+            self.shell(&convert_cmd, false).await?;
         }
         
+        // 检查文件是否存在并读取
         if path.exists() {
             let mut file = File::open(&path).map_err(|e| ToolError::new(format!("无法打开截图文件: {}", e)))?;
             let mut buffer = Vec::new();
@@ -563,17 +585,11 @@ impl ComputerTool {
             return (x, y);
         }
         
-        // 定义目标分辨率
-        let max_scaling_targets = [
-            Resolution { width: 1024, height: 768 },   // XGA (4:3)
-            Resolution { width: 1280, height: 800 },   // WXGA (16:10)
-            Resolution { width: 1366, height: 768 },   // FWXGA (~16:9)
-        ];
-        
         let ratio = self.width as f32 / self.height as f32;
         let mut target_dimension = None;
         
-        for dimension in &max_scaling_targets {
+        // 查找合适的目标分辨率，与Python版本保持一致的逻辑
+        for (_, dimension) in &MAX_SCALING_TARGETS {
             let dim_ratio = dimension.width as f32 / dimension.height as f32;
             // 允许比例有一定误差
             if (dim_ratio - ratio).abs() < 0.02 && dimension.width < self.width {
@@ -590,9 +606,6 @@ impl ComputerTool {
             match source {
                 ScalingSource::Api => {
                     // 从API坐标缩放到实际坐标
-                    if x > self.width || y > self.height {
-                        panic!("Coordinates {}, {} are out of bounds", x, y);
-                    }
                     // 放大
                     (
                         (x as f32 / x_scaling_factor).round() as u32,

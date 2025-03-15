@@ -34,6 +34,8 @@ uuid = { version = "1.7", features = ["v4", "serde"] }
 shell-escape = "0.1"
 image = "0.25"
 anyhow = "1.0"
+env_logger = "0.11.7"
+chrono = "0.4.40"
 
 [features]
 # this feature is used for production builds or when `devPath` points to the filesystem
