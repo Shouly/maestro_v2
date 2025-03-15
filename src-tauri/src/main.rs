@@ -6,7 +6,7 @@ mod commands;
 
 fn main() {
     // 使用命令模块中的命令
-    let mut app = maestro::build_app()
+    let app = maestro::build_app()
         .invoke_handler(tauri::generate_handler![commands::greet]);
     
     app.run(tauri::generate_context!())

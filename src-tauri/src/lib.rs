@@ -31,21 +31,17 @@ pub fn build_app() -> tauri::Builder<tauri::Wry> {
             .build())
 }
 
-/// 运行Tauri应用程序
-/// 
-/// 这个函数是应用程序的主要入口点，可以被main.rs调用
-pub fn run() {
-    build_app()
-        .run(tauri::generate_context!())
-        .expect("Tauri 应用运行失败");
-}
-
 /// 移动平台入口点
 /// 
 /// 这个函数是为移动平台(iOS/Android)准备的入口点
-#[cfg_attr(mobile, tauri::mobile_entry_point)]
+#[cfg(mobile)]
+#[tauri::mobile_entry_point]
 pub fn mobile_entry_point() {
-    build_app()
-        .run(tauri::generate_context!())
+    // 移动平台的入口点逻辑
+    let app = build_app();
+    
+    // 注意：移动平台的上下文生成可能需要特殊处理
+    // 这里仅作为示例，实际实现可能需要根据Tauri移动平台的文档调整
+    app.run(tauri::generate_context!())
         .expect("Tauri 移动应用运行失败");
 } 
