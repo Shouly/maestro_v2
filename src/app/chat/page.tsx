@@ -1,7 +1,7 @@
 "use client";
 
-import React, { useState, useEffect } from 'react';
-import { Settings, Sparkles } from 'lucide-react';
+import React, { useState, useEffect, useRef } from 'react';
+import { Settings, Sparkles, MessageSquare, Menu, X, PanelLeft, Plus } from 'lucide-react';
 import { v4 as uuidv4 } from 'uuid';
 import { Navbar } from '@/components/layout/Navbar';
 import { ChatInput } from '@/components/ui/ChatInput';
@@ -10,6 +10,7 @@ import { ChatSessionList, ChatSession } from '@/components/ui/ChatSessionList';
 import { ToolOutput } from '@/components/ui/ToolOutput';
 import { SettingsPanel, SettingsData } from '@/components/ui/SettingsPanel';
 import { Button } from '@/components/ui/Button';
+import { cn } from '@/lib/utils';
 
 // 消息类型
 interface Message {
@@ -36,6 +37,8 @@ export default function ChatPage() {
   const [currentSessionId, setCurrentSessionId] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [sidebarOpen, setSidebarOpen] = useState(false);
+  const messagesEndRef = useRef<HTMLDivElement>(null);
   const [settings, setSettings] = useState<SettingsData>({
     apiKey: '',
     modelVersion: 'claude-3-sonnet-20240229',
@@ -72,6 +75,13 @@ export default function ChatPage() {
       }
     ]);
   }, []);
+
+  // 滚动到最新消息
+  useEffect(() => {
+    if (messagesEndRef.current) {
+      messagesEndRef.current.scrollIntoView({ behavior: 'smooth' });
+    }
+  }, [messages, tools]);
 
   // 处理发送消息
   const handleSendMessage = (content: string) => {
@@ -139,6 +149,7 @@ export default function ChatPage() {
     setCurrentSessionId(newSession.id);
     setMessages([]);
     setTools([]);
+    setSidebarOpen(false); // 移动端创建新会话后关闭侧边栏
   };
 
   // 选择会话
@@ -167,6 +178,8 @@ export default function ChatPage() {
       setMessages([]);
       setTools([]);
     }
+    
+    setSidebarOpen(false); // 移动端选择会话后关闭侧边栏
   };
 
   // 删除会话
@@ -211,15 +224,23 @@ export default function ChatPage() {
     // 这里应该保存设置到本地存储
   };
 
+  // 切换侧边栏
+  const toggleSidebar = () => {
+    setSidebarOpen(!sidebarOpen);
+  };
+
   return (
     <div className="flex flex-col h-screen bg-[hsl(var(--background))]">
       {/* 导航栏 */}
-      <Navbar className="border-b" />
+      <Navbar className="border-b shadow-sm" />
       
       {/* 主内容区 */}
-      <div className="flex flex-1 overflow-hidden">
-        {/* 左侧会话列表 */}
-        <div className="w-64 border-r p-4 bg-[hsl(var(--secondary))] hidden md:block">
+      <div className="flex flex-1 overflow-hidden relative">
+        {/* 左侧会话列表 - 桌面版 */}
+        <div className={cn(
+          "w-72 border-r p-4 bg-[hsl(var(--secondary))] hidden md:block",
+          "transition-all duration-300 ease-in-out"
+        )}>
           <ChatSessionList
             sessions={sessions}
             onSelectSession={handleSelectSession}
@@ -230,16 +251,76 @@ export default function ChatPage() {
           />
         </div>
         
+        {/* 左侧会话列表 - 移动版 */}
+        <div className={cn(
+          "fixed inset-0 z-40 w-72 border-r p-4 bg-[hsl(var(--secondary))] md:hidden",
+          "transform transition-transform duration-300 ease-in-out",
+          sidebarOpen ? "translate-x-0" : "-translate-x-full"
+        )}>
+          <div className="flex justify-between items-center mb-4">
+            <h2 className="text-lg font-semibold flex items-center">
+              <MessageSquare className="w-5 h-5 mr-2" />
+              会话列表
+            </h2>
+            <button 
+              onClick={toggleSidebar}
+              className="p-1 rounded-full hover:bg-[hsl(var(--accent))]"
+              aria-label="关闭侧边栏"
+            >
+              <X className="w-5 h-5" />
+            </button>
+          </div>
+          <ChatSessionList
+            sessions={sessions}
+            onSelectSession={handleSelectSession}
+            onCreateSession={handleCreateSession}
+            onDeleteSession={handleDeleteSession}
+            onRenameSession={handleRenameSession}
+            onExportSession={handleExportSession}
+          />
+        </div>
+        
+        {/* 侧边栏背景遮罩 */}
+        {sidebarOpen && (
+          <div 
+            className="fixed inset-0 z-30 bg-black/50 md:hidden"
+            onClick={toggleSidebar}
+          />
+        )}
+        
         {/* 右侧对话区域 */}
-        <div className="flex-1 flex flex-col overflow-hidden">
+        <div className="flex-1 flex flex-col overflow-hidden relative">
           {/* 对话标题栏 */}
-          <div className="flex items-center justify-between px-6 py-3 border-b">
-            <h1 className="text-lg font-semibold">
-              {currentSessionId 
-                ? sessions.find(s => s.id === currentSessionId)?.title || '对话' 
-                : '对话'}
-            </h1>
+          <div className="flex items-center justify-between px-6 py-3 border-b bg-[hsl(var(--background))] shadow-sm">
+            <div className="flex items-center">
+              {/* 移动端侧边栏按钮 */}
+              <button
+                className="mr-3 p-1 rounded-md hover:bg-[hsl(var(--accent))] md:hidden"
+                onClick={toggleSidebar}
+                aria-label="打开侧边栏"
+              >
+                <PanelLeft className="w-5 h-5" />
+              </button>
+              
+              <h1 className="text-lg font-semibold">
+                {currentSessionId 
+                  ? sessions.find(s => s.id === currentSessionId)?.title || '对话' 
+                  : '对话'}
+              </h1>
+            </div>
+            
             <div className="flex items-center space-x-2">
+              {/* 移动端新建会话按钮 */}
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={handleCreateSession}
+                className="md:hidden"
+                aria-label="新建会话"
+              >
+                <Plus className="w-5 h-5" />
+              </Button>
+              
               <Button
                 variant="ghost"
                 size="icon"
@@ -252,38 +333,69 @@ export default function ChatPage() {
           </div>
           
           {/* 消息列表 */}
-          <div className="flex-1 overflow-y-auto p-4">
-            {messages.map(message => (
-              <ChatMessage
-                key={message.id}
-                role={message.role}
-                content={message.content}
-                timestamp={message.timestamp}
-              />
-            ))}
-            
-            {isLoading && (
-              <ChatMessage
-                role="assistant"
-                content=""
-                isLoading={true}
-              />
+          <div className="flex-1 overflow-y-auto p-4 md:p-6 bg-[hsl(var(--background))]">
+            {messages.length === 0 && tools.length === 0 ? (
+              <div className="h-full flex flex-col items-center justify-center text-center p-8">
+                <div className="w-16 h-16 rounded-full bg-[hsl(var(--primary))/10] flex items-center justify-center mb-4">
+                  <Sparkles className="w-8 h-8 text-[hsl(var(--primary))]" />
+                </div>
+                <h2 className="text-2xl font-bold mb-2">欢迎使用 Maestro</h2>
+                <p className="text-[hsl(var(--muted-foreground))] max-w-md mb-8">
+                  我是您的 AI 助手，可以帮助您控制计算机、执行命令和编辑文件。请告诉我您需要什么帮助？
+                </p>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3 w-full max-w-lg">
+                  <div className="p-3 border rounded-lg hover:bg-[hsl(var(--accent))] cursor-pointer transition-colors">
+                    "截取当前屏幕并分析内容"
+                  </div>
+                  <div className="p-3 border rounded-lg hover:bg-[hsl(var(--accent))] cursor-pointer transition-colors">
+                    "帮我整理桌面文件"
+                  </div>
+                  <div className="p-3 border rounded-lg hover:bg-[hsl(var(--accent))] cursor-pointer transition-colors">
+                    "查找并删除重复文件"
+                  </div>
+                  <div className="p-3 border rounded-lg hover:bg-[hsl(var(--accent))] cursor-pointer transition-colors">
+                    "帮我编写一个简单的脚本"
+                  </div>
+                </div>
+              </div>
+            ) : (
+              <>
+                {messages.map(message => (
+                  <ChatMessage
+                    key={message.id}
+                    role={message.role}
+                    content={message.content}
+                    timestamp={message.timestamp}
+                  />
+                ))}
+                
+                {isLoading && (
+                  <ChatMessage
+                    role="assistant"
+                    content=""
+                    isLoading={true}
+                  />
+                )}
+                
+                {/* 工具输出 */}
+                {tools.map(tool => (
+                  <ToolOutput
+                    key={tool.id}
+                    type={tool.type}
+                    title={tool.title}
+                    content={tool.content}
+                    timestamp={tool.timestamp}
+                  />
+                ))}
+                
+                {/* 用于自动滚动的空div */}
+                <div ref={messagesEndRef} />
+              </>
             )}
-            
-            {/* 工具输出 */}
-            {tools.map(tool => (
-              <ToolOutput
-                key={tool.id}
-                type={tool.type}
-                title={tool.title}
-                content={tool.content}
-                timestamp={tool.timestamp}
-              />
-            ))}
           </div>
           
           {/* 输入区域 */}
-          <div className="p-4 border-t">
+          <div className="p-4 border-t bg-[hsl(var(--background))] shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.05)]">
             <ChatInput
               onSend={handleSendMessage}
               isLoading={isLoading}
