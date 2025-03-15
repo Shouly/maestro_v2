@@ -91,15 +91,114 @@ pub struct ComputerTool {
 impl ComputerTool {
     /// 创建一个新的计算机控制工具实例
     pub fn new() -> Result<Self, ToolError> {
-        let width = env::var("WIDTH")
-            .map_err(|_| ToolError::new("WIDTH环境变量未设置"))?
-            .parse::<u32>()
-            .map_err(|_| ToolError::new("WIDTH环境变量不是有效的数字"))?;
+        // 尝试从环境变量获取宽度和高度
+        let width = match env::var("WIDTH") {
+            Ok(w) => w.parse::<u32>()
+                .map_err(|_| ToolError::new("WIDTH环境变量不是有效的数字"))?,
+            Err(_) => {
+                // 尝试获取系统屏幕尺寸
+                #[cfg(target_os = "macos")]
+                {
+                    // 在 macOS 上使用 NSScreen 获取屏幕尺寸
+                    let output = Command::new("sh")
+                        .arg("-c")
+                        .arg("system_profiler SPDisplaysDataType | grep Resolution | awk '{print $2}'")
+                        .output()
+                        .map_err(|e| ToolError::new(&format!("无法获取屏幕宽度: {}", e)))?;
+                    
+                    let width_str = String::from_utf8_lossy(&output.stdout);
+                    width_str.trim().parse::<u32>()
+                        .unwrap_or(1280) // 默认宽度
+                }
+                
+                #[cfg(target_os = "linux")]
+                {
+                    // 在 Linux 上使用 xrandr 获取屏幕尺寸
+                    let output = Command::new("sh")
+                        .arg("-c")
+                        .arg("xrandr | grep '*' | awk '{print $1}' | cut -d 'x' -f1 | head -n1")
+                        .output()
+                        .map_err(|e| ToolError::new(&format!("无法获取屏幕宽度: {}", e)))?;
+                    
+                    let width_str = String::from_utf8_lossy(&output.stdout);
+                    width_str.trim().parse::<u32>()
+                        .unwrap_or(1280) // 默认宽度
+                }
+                
+                #[cfg(target_os = "windows")]
+                {
+                    // 在 Windows 上使用 PowerShell 获取屏幕尺寸
+                    let output = Command::new("powershell")
+                        .arg("-Command")
+                        .arg("[System.Windows.Forms.Screen]::PrimaryScreen.Bounds.Width")
+                        .output()
+                        .map_err(|e| ToolError::new(&format!("无法获取屏幕宽度: {}", e)))?;
+                    
+                    let width_str = String::from_utf8_lossy(&output.stdout);
+                    width_str.trim().parse::<u32>()
+                        .unwrap_or(1280) // 默认宽度
+                }
+                
+                #[cfg(not(any(target_os = "macos", target_os = "linux", target_os = "windows")))]
+                {
+                    1280 // 默认宽度
+                }
+            }
+        };
 
-        let height = env::var("HEIGHT")
-            .map_err(|_| ToolError::new("HEIGHT环境变量未设置"))?
-            .parse::<u32>()
-            .map_err(|_| ToolError::new("HEIGHT环境变量不是有效的数字"))?;
+        let height = match env::var("HEIGHT") {
+            Ok(h) => h.parse::<u32>()
+                .map_err(|_| ToolError::new("HEIGHT环境变量不是有效的数字"))?,
+            Err(_) => {
+                // 尝试获取系统屏幕尺寸
+                #[cfg(target_os = "macos")]
+                {
+                    // 在 macOS 上使用 NSScreen 获取屏幕尺寸
+                    let output = Command::new("sh")
+                        .arg("-c")
+                        .arg("system_profiler SPDisplaysDataType | grep Resolution | awk '{print $4}'")
+                        .output()
+                        .map_err(|e| ToolError::new(&format!("无法获取屏幕高度: {}", e)))?;
+                    
+                    let height_str = String::from_utf8_lossy(&output.stdout);
+                    height_str.trim().parse::<u32>()
+                        .unwrap_or(720) // 默认高度
+                }
+                
+                #[cfg(target_os = "linux")]
+                {
+                    // 在 Linux 上使用 xrandr 获取屏幕尺寸
+                    let output = Command::new("sh")
+                        .arg("-c")
+                        .arg("xrandr | grep '*' | awk '{print $1}' | cut -d 'x' -f2 | head -n1")
+                        .output()
+                        .map_err(|e| ToolError::new(&format!("无法获取屏幕高度: {}", e)))?;
+                    
+                    let height_str = String::from_utf8_lossy(&output.stdout);
+                    height_str.trim().parse::<u32>()
+                        .unwrap_or(720) // 默认高度
+                }
+                
+                #[cfg(target_os = "windows")]
+                {
+                    // 在 Windows 上使用 PowerShell 获取屏幕尺寸
+                    let output = Command::new("powershell")
+                        .arg("-Command")
+                        .arg("[System.Windows.Forms.Screen]::PrimaryScreen.Bounds.Height")
+                        .output()
+                        .map_err(|e| ToolError::new(&format!("无法获取屏幕高度: {}", e)))?;
+                    
+                    let height_str = String::from_utf8_lossy(&output.stdout);
+                    height_str.trim().parse::<u32>()
+                        .unwrap_or(720) // 默认高度
+                }
+                
+                #[cfg(not(any(target_os = "macos", target_os = "linux", target_os = "windows")))]
+                {
+                    720 // 默认高度
+                }
+            }
+        };
 
         let display_num = env::var("DISPLAY_NUM").ok().map(|v| {
             v.parse::<u32>()

@@ -109,7 +109,12 @@ export interface ClaudeConfig {
 export interface Tool {
   name: string;
   description: string;
-  input_schema: Record<string, any>;
+  input_schema: {
+    type: string;
+    properties: Record<string, any>;
+    required?: string[];
+    additionalProperties?: boolean;
+  };
 }
 
 // 可用工具
@@ -132,6 +137,7 @@ export const AVAILABLE_TOOLS: Tool[] = [
         amount: { type: 'number' },
       },
       required: ['action'],
+      additionalProperties: false,
     },
   },
   {
@@ -144,6 +150,7 @@ export const AVAILABLE_TOOLS: Tool[] = [
         restart: { type: 'boolean' },
       },
       required: ['command'],
+      additionalProperties: false,
     },
   },
   {
@@ -164,6 +171,7 @@ export const AVAILABLE_TOOLS: Tool[] = [
         view_range: { type: 'string' },
       },
       required: ['command', 'path'],
+      additionalProperties: false,
     },
   },
 ];

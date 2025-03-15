@@ -14,11 +14,22 @@ pub struct ComputerCommandArgs {
     scroll_amount: Option<u32>,
     duration: Option<f32>,
     key: Option<String>,
+    width: Option<u32>,
+    height: Option<u32>,
 }
 
 /// 执行计算机控制命令
 #[command]
 pub async fn execute_computer_command(args: ComputerCommandArgs) -> Result<ToolResult, String> {
+    // 设置环境变量
+    if let Some(w) = args.width {
+        std::env::set_var("WIDTH", w.to_string());
+    }
+    
+    if let Some(h) = args.height {
+        std::env::set_var("HEIGHT", h.to_string());
+    }
+    
     let computer_tool = ComputerTool::new().map_err(|e| e.to_string())?;
     
     computer_tool.execute(
@@ -36,14 +47,32 @@ pub async fn execute_computer_command(args: ComputerCommandArgs) -> Result<ToolR
 
 /// 获取计算机工具配置
 #[command]
-pub fn get_computer_options() -> Result<serde_json::Value, String> {
+pub fn get_computer_options(width: Option<u32>, height: Option<u32>) -> Result<serde_json::Value, String> {
+    // 设置环境变量
+    if let Some(w) = width {
+        std::env::set_var("WIDTH", w.to_string());
+    }
+    
+    if let Some(h) = height {
+        std::env::set_var("HEIGHT", h.to_string());
+    }
+    
     let computer_tool = ComputerTool::new().map_err(|e| e.to_string())?;
     Ok(computer_tool.options())
 }
 
 /// 截取屏幕截图
 #[command]
-pub async fn take_screenshot() -> Result<ToolResult, String> {
+pub async fn take_screenshot(width: Option<u32>, height: Option<u32>) -> Result<ToolResult, String> {
+    // 设置环境变量
+    if let Some(w) = width {
+        std::env::set_var("WIDTH", w.to_string());
+    }
+    
+    if let Some(h) = height {
+        std::env::set_var("HEIGHT", h.to_string());
+    }
+    
     let computer_tool = ComputerTool::new().map_err(|e| e.to_string())?;
     computer_tool.execute(
         ComputerAction::Screenshot,

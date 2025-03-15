@@ -103,6 +103,17 @@ export default function ChatPage() {
     // 从本地存储加载会话和设置
     const loadSavedData = async () => {
       try {
+        // 加载设置
+        const savedSettings = localStorage.getItem('maestro-settings');
+        if (savedSettings) {
+          try {
+            const parsedSettings = JSON.parse(savedSettings);
+            setSettings(prev => ({ ...prev, ...parsedSettings }));
+          } catch (error) {
+            console.error('Failed to parse saved settings:', error);
+          }
+        }
+        
         // 这里应该从本地存储加载会话和设置
         // 示例数据
         const demoSessions: ChatSession[] = [
@@ -141,7 +152,19 @@ export default function ChatPage() {
 
         // 获取计算机工具配置
         try {
-          const options = await invoke('get_computer_options');
+          // 获取屏幕尺寸
+          const screenSize = await invoke<[number, number]>('get_screen_size');
+          const width = screenSize ? screenSize[0] : window.screen.width || 1280;
+          const height = screenSize ? screenSize[1] : window.screen.height || 720;
+          
+          console.log('Screen size:', width, 'x', height);
+          
+          const options = await invoke('get_computer_options', {
+            args: {
+              width,
+              height
+            }
+          });
           console.log('Computer tool options:', options);
         } catch (error) {
           console.error('Failed to get computer options:', error);
@@ -260,6 +283,21 @@ export default function ChatPage() {
   const handleSendMessage = async (content: string) => {
     if (!content.trim()) return;
     
+    // 检查 API 密钥是否已设置
+    if (!settings.apiKey || settings.apiKey.trim() === '') {
+      const errorTool: Tool = {
+        id: uuidv4(),
+        type: 'error',
+        title: 'API 密钥未设置',
+        content: '请在设置中配置有效的 Anthropic API 密钥后再尝试发送消息。',
+        timestamp: new Date(),
+      };
+      
+      setTools(prev => [...prev, errorTool]);
+      setSettingsOpen(true); // 自动打开设置面板
+      return;
+    }
+    
     try {
       // 设置加载状态
       setIsLoading(true);
@@ -369,11 +407,17 @@ export default function ChatPage() {
       console.error('发送消息时出错:', error);
       
       // 显示错误消息
+      const errorMessage = error instanceof Error 
+        ? error.message 
+        : typeof error === 'string' 
+          ? error 
+          : '未知错误';
+      
       const errorTool: Tool = {
         id: uuidv4(),
         type: 'error',
         title: '发送消息时出错',
-        content: `${error}`,
+        content: errorMessage,
         timestamp: new Date(),
       };
       
@@ -491,8 +535,35 @@ export default function ChatPage() {
     setSettings(newSettings);
     setSettingsOpen(false);
     
-    // 这里应该保存设置到本地存储
-    console.log('Saving settings:', newSettings);
+    // 保存设置到本地存储
+    try {
+      localStorage.setItem('maestro-settings', JSON.stringify(newSettings));
+      console.log('Settings saved to local storage');
+      
+      // 显示成功消息
+      const successTool: Tool = {
+        id: uuidv4(),
+        type: 'success',
+        title: '设置已保存',
+        content: '您的设置已成功保存。',
+        timestamp: new Date(),
+      };
+      
+      setTools(prev => [...prev, successTool]);
+    } catch (error) {
+      console.error('Failed to save settings:', error);
+      
+      // 显示错误消息
+      const errorTool: Tool = {
+        id: uuidv4(),
+        type: 'error',
+        title: '保存设置失败',
+        content: `无法保存设置: ${error}`,
+        timestamp: new Date(),
+      };
+      
+      setTools(prev => [...prev, errorTool]);
+    }
   };
 
   // 切换侧边栏

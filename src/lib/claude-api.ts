@@ -8,6 +8,10 @@ export class ClaudeApiClient {
   private client: Anthropic;
 
   constructor(apiKey: string) {
+    if (!apiKey || apiKey.trim() === '') {
+      throw new Error('API 密钥不能为空。请在设置中配置有效的 API 密钥。');
+    }
+    
     this.client = new Anthropic({
       apiKey: apiKey,
       dangerouslyAllowBrowser: true,
@@ -39,10 +43,7 @@ export class ClaudeApiClient {
     const anthropicTools = tools.length > 0 ? tools.map(tool => ({
       name: tool.name,
       description: tool.description,
-      input_schema: {
-        type: "object" as const,
-        properties: tool.input_schema,
-      },
+      input_schema: tool.input_schema,
     })) : undefined;
 
     // 准备额外参数
@@ -56,6 +57,11 @@ export class ClaudeApiClient {
       };
     }
 
+    // 添加 beta 标志
+    if (options?.betas && options.betas.length > 0) {
+      extraParams.beta = options.betas;
+    }
+
     // 处理图像截断
     if (options?.onlyNMostRecentImages) {
       this.filterRecentImages(messages, options.onlyNMostRecentImages);
@@ -67,40 +73,56 @@ export class ClaudeApiClient {
     }
 
     try {
-      // 直接调用API
-      const response = await this.client.messages.create({
+      // 使用流式响应
+      const stream = await this.client.messages.stream({
         model: model,
         max_tokens: maxTokens,
         messages: anthropicMessages as any,
         system: systemPrompt,
         tools: anthropicTools as any,
+        ...extraParams,
       });
 
       // 处理响应
       const responseContentBlocks: ContentBlock[] = [];
-
-      // 转换响应内容为内容块
-      for (const content of response.content) {
-        if (content.type === 'text') {
-          const textBlock: TextBlock = {
-            type: 'text',
-            text: content.text,
-          };
-          responseContentBlocks.push(textBlock);
-
-          // 回调内容块
-          if (onContentBlock) {
-            onContentBlock(textBlock);
+      
+      // 收集完整响应
+      for await (const chunk of stream) {
+        if (chunk.type === 'content_block_delta') {
+          const delta = chunk.delta;
+          
+          // 处理文本块
+          if (delta.type === 'text_delta') {
+            // 查找或创建文本块
+            let textBlock = responseContentBlocks.find(
+              block => block.type === 'text'
+            ) as TextBlock | undefined;
+            
+            if (!textBlock) {
+              textBlock = { type: 'text', text: '' };
+              responseContentBlocks.push(textBlock);
+            }
+            
+            // 更新文本内容
+            textBlock.text += delta.text;
+            
+            // 回调内容块
+            if (onContentBlock) {
+              onContentBlock({ ...textBlock });
+            }
           }
-        } else if (content.type === 'tool_use') {
+        } else if (chunk.type === 'content_block_start' && chunk.content_block.type === 'tool_use') {
+          // 处理工具使用块
+          const toolUseData = chunk.content_block;
           const toolUseBlock: ToolUseBlock = {
             type: 'tool_use',
-            id: content.id,
-            name: content.name,
-            input: content.input as Record<string, any>,
+            id: toolUseData.id,
+            name: toolUseData.name,
+            input: toolUseData.input as Record<string, any>,
           };
+          
           responseContentBlocks.push(toolUseBlock);
-
+          
           // 回调内容块
           if (onContentBlock) {
             onContentBlock(toolUseBlock);
@@ -136,9 +158,27 @@ export class ClaudeApiClient {
           // 根据工具类型执行不同的操作
           switch (toolName) {
             case 'computer':
+              // 获取屏幕尺寸
+              let width = window.screen.width || 1280;
+              let height = window.screen.height || 720;
+              
+              try {
+                const screenSize = await core.invoke<[number, number]>('get_screen_size');
+                if (screenSize) {
+                  width = screenSize[0];
+                  height = screenSize[1];
+                }
+              } catch (e) {
+                console.warn('Failed to get screen size from Tauri:', e);
+              }
+              
               // 执行计算机操作
               result = await core.invoke<ToolResult>('execute_computer_command', {
-                args: { ...toolInput }
+                args: { 
+                  ...toolInput,
+                  width,
+                  height
+                }
               });
               break;
 
