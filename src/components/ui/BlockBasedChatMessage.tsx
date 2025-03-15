@@ -64,7 +64,7 @@ export const BlockBasedChatMessage: React.FC<BlockBasedChatMessageProps> = ({
                 : "bg-[hsl(var(--secondary))] text-[hsl(var(--foreground))] rounded-tl-none",
               "prose prose-sm max-w-none" // 使用Tailwind Typography
             )}>
-              {isLoading && !blocks.some(b => b.type === 'thinking') ? (
+              {isLoading && !blocks.some(b => b.type === 'thinking') && blocks.filter(b => b.type === 'text').length === 0 ? (
                 <div className="flex items-center space-x-2">
                   <Loader2 className="w-4 h-4 animate-spin" />
                   <span>思考中...</span>
