@@ -2,12 +2,12 @@
 
 import { Button } from '@/components/ui/Button';
 import { ChatInput } from '@/components/ui/ChatInput';
-import { ChatMessage, MessageRole } from '@/components/ui/ChatMessage';
+import { MessageRole } from '@/components/ui/ChatMessage';
 import { ChatSession, ChatSessionList } from '@/components/ui/ChatSessionList';
 import { MainNavigation } from '@/components/ui/MainNavigation';
 import { MobileNavigation } from '@/components/ui/MobileNavigation';
 import { SettingsData, SettingsPanel } from '@/components/ui/SettingsPanel';
-import { ToolOutput } from '@/components/ui/ToolOutput';
+import { EnhancedChatMessage, Tool as EnhancedTool, ToolType } from '@/components/ui/EnhancedChatMessage';
 import { Menu, MessageSquare, Plus, Sparkles } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import { v4 as uuidv4 } from 'uuid';
@@ -30,6 +30,7 @@ interface Message {
   role: MessageRole;
   content: string;
   timestamp: Date;
+  toolIds?: string[]; // 关联的工具ID列表
 }
 
 // 工具输出类型
@@ -208,6 +209,7 @@ export default function ChatPage() {
           role: 'assistant',
           content: textBlock.text,
           timestamp: new Date(),
+          toolIds: [], // 初始化空的工具ID列表
         };
         
         // 添加到消息列表
@@ -256,6 +258,21 @@ export default function ChatPage() {
       };
       
       setTools(prev => [...prev, toolCall]);
+      
+      // 将工具调用信息追加到当前消息内容中
+      if (currentResponseId) {
+        setMessages(prev => 
+          prev.map(m => 
+            m.id === currentResponseId 
+              ? { 
+                  ...m, 
+                  content: m.content + `\n\n**正在执行: ${toolUseBlock.name}**\n\`\`\`json\n${JSON.stringify(toolUseBlock.input, null, 2)}\n\`\`\``,
+                  toolIds: [...(m.toolIds || []), toolUseBlock.id] 
+                } 
+              : m
+          )
+        );
+      }
     }
     
     // 滚动到底部
@@ -280,6 +297,32 @@ export default function ChatPage() {
       
       // 更新工具列表
       setTools(prev => [...prev, toolResult]);
+      
+      // 将工具结果追加到当前消息内容中
+      if (currentResponseId) {
+        const resultTitle = toolCall.title.replace('正在执行', '执行结果');
+        const resultType = result.error ? '❌ ' : '✅ ';
+        const resultContent = result.output || result.error || '操作成功完成';
+        
+        let appendContent = `\n\n${resultType}**${resultTitle}**\n\`\`\`\n${resultContent}\n\`\`\``;
+        
+        // 如果有图片，添加图片标记
+        if (result.base64_image) {
+          appendContent += '\n\n**截图结果**\n![截图](data:image/png;base64,' + result.base64_image + ')';
+        }
+        
+        setMessages(prev => 
+          prev.map(m => 
+            m.id === currentResponseId 
+              ? { 
+                  ...m, 
+                  content: m.content + appendContent,
+                  toolIds: [...(m.toolIds || []), toolResult.id] 
+                } 
+              : m
+          )
+        );
+      }
       
       // 滚动到底部
       scrollToBottom();
@@ -661,14 +704,22 @@ export default function ChatPage() {
           {/* 消息列表 */}
           <div className="flex-1 flex flex-col overflow-hidden">
             <div className="flex-1 overflow-y-auto p-4">
-              {messages.map(message => (
-                <ChatMessage
-                  key={message.id}
-                  role={message.role}
-                  content={message.content}
-                  timestamp={message.timestamp}
-                />
-              ))}
+              {messages.map(message => {
+                // 获取与此消息关联的工具
+                const messageTools = message.toolIds 
+                  ? tools.filter(tool => message.toolIds?.includes(tool.id)) as EnhancedTool[]
+                  : [];
+                
+                return (
+                  <EnhancedChatMessage
+                    key={message.id}
+                    role={message.role}
+                    content={message.content}
+                    timestamp={message.timestamp}
+                    tools={messageTools}
+                  />
+                );
+              })}
               {isLoading && (
                 <div className="flex justify-center my-4">
                   <div className="animate-pulse flex space-x-2">
@@ -688,38 +739,6 @@ export default function ChatPage() {
                 isLoading={isLoading}
                 placeholder="输入消息..."
               />
-            </div>
-          </div>
-          
-          {/* 工具输出区域 */}
-          <div className="hidden lg:flex lg:w-96 border-l border-[hsl(var(--border))] flex-col overflow-hidden">
-            <div className="p-4 border-b border-[hsl(var(--border))]">
-              <div className="flex items-center">
-                <svg className="h-5 w-5 text-[hsl(var(--primary))] mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 3v2m6-2v2M9 19v2m6-2v2M5 9H3m2 6H3m18-6h-2m2 6h-2M7 19h10a2 2 0 002-2V7a2 2 0 00-2-2H7a2 2 0 00-2 2v10a2 2 0 002 2zM9 9h6v6H9V9z" />
-                </svg>
-                <h2 className="text-lg font-semibold">工具输出</h2>
-              </div>
-            </div>
-            
-            <div className="flex-1 overflow-y-auto p-4">
-              {tools.length === 0 ? (
-                <div className="flex flex-col items-center justify-center h-full text-[hsl(var(--muted-foreground))]">
-                  <MessageSquare className="h-12 w-12 mb-4 opacity-20" />
-                  <p className="text-center">工具输出将显示在这里</p>
-                </div>
-              ) : (
-                tools.map(tool => (
-                  <ToolOutput
-                    key={tool.id}
-                    type={tool.type}
-                    title={tool.title}
-                    content={tool.content}
-                    imageData={tool.imageData}
-                    timestamp={tool.timestamp}
-                  />
-                ))
-              )}
             </div>
           </div>
         </div>
