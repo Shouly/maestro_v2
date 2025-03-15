@@ -496,18 +496,35 @@ impl ComputerTool {
         let filename = format!("screenshot_{}.png", Uuid::new_v4().to_string());
         let path = output_dir.join(filename);
         
-        // 尝试使用gnome-screenshot，如果不可用则使用scrot
-        let has_gnome_screenshot = Command::new("which")
-            .arg("gnome-screenshot")
-            .stdout(Stdio::null())
-            .status()
-            .map(|s| s.success())
-            .unwrap_or(false);
-        
-        let screenshot_cmd = if has_gnome_screenshot {
-            format!("{}gnome-screenshot -f {} -p", self.display_prefix, path.display())
+        // 根据操作系统选择不同的截图命令
+        let screenshot_cmd = if cfg!(target_os = "macos") {
+            // macOS使用screencapture
+            format!("screencapture -x {}", path.display())
+        } else if cfg!(target_os = "linux") {
+            // Linux先尝试gnome-screenshot，如果不可用则使用scrot
+            let has_gnome_screenshot = Command::new("which")
+                .arg("gnome-screenshot")
+                .stdout(Stdio::null())
+                .status()
+                .map(|s| s.success())
+                .unwrap_or(false);
+            
+            if has_gnome_screenshot {
+                format!("{}gnome-screenshot -f {} -p", self.display_prefix, path.display())
+            } else {
+                format!("{}scrot -p {}", self.display_prefix, path.display())
+            }
+        } else if cfg!(target_os = "windows") {
+            // Windows可以使用PowerShell的截图功能
+            format!(
+                "powershell -command \"Add-Type -AssemblyName System.Windows.Forms; \
+                [System.Windows.Forms.SendKeys]::SendWait('%{{PRTSC}}'); \
+                $img = [System.Windows.Forms.Clipboard]::GetImage(); \
+                $img.Save('{}')\"",
+                path.display()
+            )
         } else {
-            format!("{}scrot -p {}", self.display_prefix, path.display())
+            return Err(ToolError::new("不支持的操作系统"));
         };
         
         // 使用 Box::pin 来避免无限大的 Future

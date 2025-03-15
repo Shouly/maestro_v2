@@ -200,10 +200,30 @@ export class ClaudeApiClient {
                 console.warn('Failed to get screen size from Tauri:', e);
               }
               
+              // 转换参数格式
+              const transformedInput = { ...toolInput };
+              
+              // 将coordinate数组转换为(x, y)坐标
+              if (Array.isArray(transformedInput.coordinate) && transformedInput.coordinate.length === 2) {
+                transformedInput.coordinate = [
+                  transformedInput.coordinate[0], 
+                  transformedInput.coordinate[1]
+                ];
+              }
+              
+              // 将action名称转换为后端期望的格式
+              if (transformedInput.action === 'click') {
+                transformedInput.action = 'left_click';
+              } else if (transformedInput.action === 'press') {
+                transformedInput.action = 'key';
+              }
+              
+              console.log('执行计算机操作:', JSON.stringify(transformedInput, null, 2));
+              
               // 执行计算机操作
               result = await core.invoke<ToolResult>('execute_computer_command', {
                 args: { 
-                  ...toolInput,
+                  ...transformedInput,
                   width,
                   height
                 }
