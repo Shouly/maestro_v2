@@ -1,11 +1,17 @@
 use tauri::Manager;
 
+// 导出tools模块
+pub mod tools;
+pub mod commands;
+
 #[derive(Debug, thiserror::Error)]
 pub enum Error {
     #[error(transparent)]
     Io(#[from] std::io::Error),
     #[error(transparent)]
     Tauri(#[from] tauri::Error),
+    #[error(transparent)]
+    Tool(#[from] tools::base::ToolError),
 }
 
 pub type Result<T> = std::result::Result<T, Error>;
