@@ -199,7 +199,6 @@ export default function ChatPage() {
       
       if (!existingMessage) {
         // 如果没有当前响应ID或找不到对应消息，创建新的助手消息
-        // 使用固定的临时ID，而不是每次都生成新ID
         const responseId = currentResponseId || `response-${uuidv4()}`;
         console.log('创建新的助手消息，ID:', responseId);
         setCurrentResponseId(responseId);
@@ -231,14 +230,23 @@ export default function ChatPage() {
           }
         });
       } else {
-        // 更新现有助手消息
+        // 更新现有助手消息，但保留工具调用和结果部分
         console.log('更新现有助手消息，ID:', currentResponseId);
         setMessages(prev => 
-          prev.map(m => 
-            m.id === currentResponseId 
-              ? { ...m, content: textBlock.text } 
-              : m
-          )
+          prev.map(m => {
+            if (m.id === currentResponseId) {
+              // 提取现有消息中的工具调用和结果部分
+              const toolSections = m.content.match(/\n\n(\*\*正在执行:[\s\S]*?\*\*\n```json\n[\s\S]*?\n```|\n\n[✅❌] \*\*执行结果:[\s\S]*?\*\*\n```\n[\s\S]*?\n```)/g) || [];
+              const toolContent = toolSections.join('');
+              
+              // 更新文本内容，保留工具部分
+              return { 
+                ...m, 
+                content: textBlock.text + toolContent
+              };
+            }
+            return m;
+          })
         );
       }
     } else if (block.type === 'thinking') {
@@ -304,6 +312,7 @@ export default function ChatPage() {
         const resultType = result.error ? '❌ ' : '✅ ';
         const resultContent = result.output || result.error || '操作成功完成';
         
+        // 格式化工具结果，使其更清晰
         let appendContent = `\n\n${resultType}**${resultTitle}**\n\`\`\`\n${resultContent}\n\`\`\``;
         
         // 如果有图片，添加图片标记
@@ -311,6 +320,9 @@ export default function ChatPage() {
           // 使用HTML img标签而不是Markdown语法，以确保Base64图片能正确显示
           appendContent += `\n\n**截图结果**\n<img src="data:image/png;base64,${result.base64_image}" alt="截图" style="max-width:100%; border-radius:4px; border:1px solid #ddd;" />`;
         }
+        
+        // 添加分隔线，使工具结果更清晰
+        appendContent = `\n\n<hr class="tool-result-separator" />${appendContent}`;
         
         setMessages(prev => 
           prev.map(m => 

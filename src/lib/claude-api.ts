@@ -119,23 +119,31 @@ export class ClaudeApiClient {
           onContentBlock(defaultTextBlock);
         }
       } else {
-        for (const block of response.content) {
-          console.log('处理内容块:', JSON.stringify(block, null, 2));
+        // 首先收集所有文本块，合并为一个完整的文本内容
+        let completeTextContent = '';
+        const textBlocks = response.content.filter(block => block.type === 'text');
+        
+        if (textBlocks.length > 0) {
+          completeTextContent = textBlocks.map(block => block.text).join('\n\n');
           
-          if (block.type === 'text') {
-            // 创建文本块
-            const textBlock: TextBlock = { 
-              type: 'text', 
-              text: block.text 
-            };
-            responseContentBlocks.push(textBlock);
-            
-            // 回调内容块
-            if (onContentBlock) {
-              console.log('发送文本块，长度:', textBlock.text.length);
-              onContentBlock(textBlock);
-            }
-          } else if (block.type === 'tool_use') {
+          // 创建一个合并后的文本块
+          const mergedTextBlock: TextBlock = {
+            type: 'text',
+            text: completeTextContent
+          };
+          
+          responseContentBlocks.push(mergedTextBlock);
+          
+          // 回调合并后的文本块
+          if (onContentBlock) {
+            console.log('发送合并文本块，长度:', mergedTextBlock.text.length);
+            onContentBlock(mergedTextBlock);
+          }
+        }
+        
+        // 然后处理所有工具使用块
+        for (const block of response.content) {
+          if (block.type === 'tool_use') {
             // 处理工具使用块
             console.log('处理工具使用块:', JSON.stringify(block, null, 2));
             const toolUseBlock: ToolUseBlock = {
@@ -152,7 +160,8 @@ export class ClaudeApiClient {
               console.log('发送工具使用块');
               onContentBlock(toolUseBlock);
             }
-          } else {
+          } else if (block.type !== 'text') {
+            // 处理其他类型的块（如果有）
             console.warn('未知的内容块类型:', (block as any).type);
           }
         }

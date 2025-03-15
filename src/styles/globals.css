@@ -162,4 +162,19 @@
 
 .animate-pulse-slow {
   animation: pulse-slow 3s ease-in-out infinite;
+}
+
+/* 工具结果分隔线样式 */
+.tool-result-separator {
+  margin: 1rem 0;
+  border: 0;
+  height: 1px;
+  background-image: linear-gradient(to right, rgba(0, 0, 0, 0), rgba(0, 0, 0, 0.2), rgba(0, 0, 0, 0));
+}
+
+/* 深色模式下的工具结果分隔线 */
+@media (prefers-color-scheme: dark) {
+  .tool-result-separator {
+    background-image: linear-gradient(to right, rgba(255, 255, 255, 0), rgba(255, 255, 255, 0.2), rgba(255, 255, 255, 0));
+  }
 } 
