@@ -1,36 +1,25 @@
 import React from 'react';
 import { User, Bot, Loader2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import ReactMarkdown from 'react-markdown';
-import rehypeRaw from 'rehype-raw';
+import { ContentBlock } from '@/lib/claude';
+import { ContentBlockRenderer } from './ContentBlockRenderer';
 
 export type MessageRole = 'user' | 'assistant' | 'system';
-export type ToolType = 'command' | 'screenshot' | 'code' | 'file' | 'success' | 'error' | 'info';
 
-export interface Tool {
-  id: string;
-  type: ToolType;
-  title: string;
-  content: string;
-  imageData?: string;
-  timestamp: Date;
-}
-
-export interface EnhancedChatMessageProps {
+export interface BlockBasedChatMessageProps {
   role: MessageRole;
-  content: string;
+  blocks: ContentBlock[];
   timestamp?: Date;
   isLoading?: boolean;
-  tools?: Tool[];
   className?: string;
+  tools?: any[];
 }
 
-export const EnhancedChatMessage: React.FC<EnhancedChatMessageProps> = ({
+export const BlockBasedChatMessage: React.FC<BlockBasedChatMessageProps> = ({
   role,
-  content,
+  blocks,
   timestamp,
   isLoading = false,
-  tools = [],
   className,
 }) => {
   const isUser = role === 'user';
@@ -38,33 +27,6 @@ export const EnhancedChatMessage: React.FC<EnhancedChatMessageProps> = ({
     hour: '2-digit',
     minute: '2-digit',
   }).format(timestamp) : '';
-
-  // 自定义组件，特别处理图片
-  const components = {
-    img: ({ src, alt, ...props }: React.ImgHTMLAttributes<HTMLImageElement>) => (
-      <div className="my-2 overflow-hidden rounded-md border border-[hsl(var(--border))]">
-        <img 
-          src={src} 
-          alt={alt || "图片"} 
-          className="max-w-full h-auto" 
-          {...props} 
-        />
-      </div>
-    ),
-    // 自定义代码块样式
-    code: ({ className, children, ...props }: React.HTMLAttributes<HTMLElement>) => {
-      return (
-        <code className="px-1 py-0.5 bg-[hsl(var(--muted))] rounded text-xs" {...props}>
-          {children}
-        </code>
-      );
-    },
-    pre: ({ children, ...props }: React.HTMLAttributes<HTMLPreElement>) => (
-      <pre className="my-2 p-2 overflow-auto rounded-md bg-[hsl(var(--muted))] text-xs font-mono" {...props}>
-        {children}
-      </pre>
-    ),
-  };
 
   return (
     <div className={cn(
@@ -108,18 +70,17 @@ export const EnhancedChatMessage: React.FC<EnhancedChatMessageProps> = ({
                   <span>思考中...</span>
                 </div>
               ) : (
-                <div className="whitespace-pre-wrap break-words">
+                <div>
                   {isUser ? (
-                    // 用户消息直接显示文本
-                    content
+                    // 用户消息只显示文本块
+                    blocks.filter(block => block.type === 'text').map((block, index) => (
+                      <ContentBlockRenderer key={index} block={block} />
+                    ))
                   ) : (
-                    // AI消息使用Markdown渲染
-                    <ReactMarkdown 
-                      components={components}
-                      rehypePlugins={[rehypeRaw]} // 允许渲染HTML
-                    >
-                      {content}
-                    </ReactMarkdown>
+                    // AI消息显示所有类型的块
+                    blocks.map((block, index) => (
+                      <ContentBlockRenderer key={index} block={block} />
+                    ))
                   )}
                 </div>
               )}

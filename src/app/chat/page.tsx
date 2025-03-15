@@ -2,12 +2,11 @@
 
 import { Button } from '@/components/ui/Button';
 import { ChatInput } from '@/components/ui/ChatInput';
-import { MessageRole } from '@/components/ui/ChatMessage';
 import { ChatSession, ChatSessionList } from '@/components/ui/ChatSessionList';
 import { MainNavigation } from '@/components/ui/MainNavigation';
 import { MobileNavigation } from '@/components/ui/MobileNavigation';
 import { SettingsData, SettingsPanel } from '@/components/ui/SettingsPanel';
-import { EnhancedChatMessage, Tool as EnhancedTool, ToolType } from '@/components/ui/EnhancedChatMessage';
+import { BlockBasedChatMessage, MessageRole } from '@/components/ui/BlockBasedChatMessage';
 import { Menu, MessageSquare, Plus, Sparkles } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import { v4 as uuidv4 } from 'uuid';
@@ -21,14 +20,15 @@ import {
   Message as ClaudeMessage, 
   TextBlock, 
   ToolResult, 
-  ToolUseBlock 
+  ToolUseBlock,
+  ThinkingBlock
 } from '@/lib/claude';
 
 // 消息类型
 interface Message {
   id: string;
   role: MessageRole;
-  content: string;
+  blocks: ContentBlock[];
   timestamp: Date;
   toolIds?: string[]; // 关联的工具ID列表
 }
@@ -206,7 +206,7 @@ export default function ChatPage() {
         const assistantMessage: Message = {
           id: responseId,
           role: 'assistant',
-          content: textBlock.text,
+          blocks: [textBlock],
           timestamp: new Date(),
           toolIds: [], // 初始化空的工具ID列表
         };
@@ -220,7 +220,7 @@ export default function ChatPage() {
             // 如果已经有相同ID的消息，更新它
             return prev.map(m => 
               m.id === responseId 
-                ? { ...m, content: textBlock.text } 
+                ? { ...m, blocks: [textBlock] } 
                 : m
             );
           } else {
@@ -230,19 +230,15 @@ export default function ChatPage() {
           }
         });
       } else {
-        // 更新现有助手消息，但保留工具调用和结果部分
+        // 更新现有助手消息
         console.log('更新现有助手消息，ID:', currentResponseId);
         setMessages(prev => 
           prev.map(m => {
             if (m.id === currentResponseId) {
-              // 提取现有消息中的工具调用和结果部分
-              const toolSections = m.content.match(/\n\n(\*\*正在执行:[\s\S]*?\*\*\n```json\n[\s\S]*?\n```|\n\n[✅❌] \*\*执行结果:[\s\S]*?\*\*\n```\n[\s\S]*?\n```)/g) || [];
-              const toolContent = toolSections.join('');
-              
-              // 更新文本内容，保留工具部分
+              // 更新文本内容
               return { 
                 ...m, 
-                content: textBlock.text + toolContent
+                blocks: [...m.blocks.filter(b => b.type !== 'text'), textBlock],
               };
             }
             return m;
@@ -251,7 +247,21 @@ export default function ChatPage() {
       }
     } else if (block.type === 'thinking') {
       // 思考块 - 可以在UI中显示思考过程
-      // 这里可以添加思考过程的显示逻辑
+      const thinkingBlock = block as ThinkingBlock;
+      
+      // 如果有当前响应ID，更新消息
+      if (currentResponseId) {
+        setMessages(prev => 
+          prev.map(m => 
+            m.id === currentResponseId 
+              ? { 
+                  ...m, 
+                  blocks: [...m.blocks.filter(b => b.type !== 'thinking'), thinkingBlock],
+                } 
+              : m
+          )
+        );
+      }
     } else if (block.type === 'tool_use') {
       // 工具使用块 - 显示工具调用
       const toolUseBlock = block as ToolUseBlock;
@@ -274,7 +284,7 @@ export default function ChatPage() {
             m.id === currentResponseId 
               ? { 
                   ...m, 
-                  content: m.content + `\n\n**正在执行: ${toolUseBlock.name}**\n\`\`\`json\n${JSON.stringify(toolUseBlock.input, null, 2)}\n\`\`\``,
+                  blocks: [...m.blocks, toolUseBlock],
                   toolIds: [...(m.toolIds || []), toolUseBlock.id] 
                 } 
               : m
@@ -309,27 +319,27 @@ export default function ChatPage() {
       // 将工具结果追加到当前消息内容中
       if (currentResponseId) {
         const resultTitle = toolCall.title.replace('正在执行', '执行结果');
-        const resultType = result.error ? '❌ ' : '✅ ';
         const resultContent = result.output || result.error || '操作成功完成';
         
-        // 格式化工具结果，使其更清晰
-        let appendContent = `\n\n${resultType}**${resultTitle}**\n\`\`\`\n${resultContent}\n\`\`\``;
+        // 创建工具结果块
+        const toolResultBlock: ContentBlock = {
+          type: 'tool_result',
+          tool_use_id: toolUseId,
+          content: resultContent,
+          is_error: !!result.error
+        };
         
-        // 如果有图片，添加图片标记
+        // 如果有图片，添加图片
         if (result.base64_image) {
-          // 使用HTML img标签而不是Markdown语法，以确保Base64图片能正确显示
-          appendContent += `\n\n**截图结果**\n<img src="data:image/png;base64,${result.base64_image}" alt="截图" style="max-width:100%; border-radius:4px; border:1px solid #ddd;" />`;
+          (toolResultBlock as any).base64_image = result.base64_image;
         }
-        
-        // 添加分隔线，使工具结果更清晰
-        appendContent = `\n\n<hr class="tool-result-separator" />${appendContent}`;
         
         setMessages(prev => 
           prev.map(m => 
             m.id === currentResponseId 
               ? { 
                   ...m, 
-                  content: m.content + appendContent,
+                  blocks: [...m.blocks, toolResultBlock],
                   toolIds: [...(m.toolIds || []), toolResult.id] 
                 } 
               : m
@@ -349,22 +359,6 @@ export default function ChatPage() {
     // 设置处理状态和重置当前响应ID
     setIsProcessing(true);
     setCurrentResponseId(null);
-    console.log('发送新消息，重置currentResponseId为null');
-    
-    // 检查 API 密钥是否已设置
-    if (!settings.apiKey || settings.apiKey.trim() === '') {
-      const errorTool: Tool = {
-        id: uuidv4(),
-        type: 'error',
-        title: 'API 密钥未设置',
-        content: '请在设置中配置有效的 Anthropic API 密钥后再尝试发送消息。',
-        timestamp: new Date(),
-      };
-      
-      setTools(prev => [...prev, errorTool]);
-      setSettingsOpen(true); // 自动打开设置面板
-      return;
-    }
     
     try {
       // 设置加载状态
@@ -374,17 +368,23 @@ export default function ChatPage() {
       const userMessage: Message = {
         id: uuidv4(),
         role: 'user',
-        content: content,
+        blocks: [{
+          type: 'text',
+          text: content
+        } as TextBlock],
         timestamp: new Date(),
       };
       
       // 添加到消息列表
       setMessages(prev => [...prev, userMessage]);
       
-      // 创建Claude消息格式
+      // 创建Claude消息
       const userClaudeMessage: ClaudeMessage = {
         role: 'user',
-        content: [{ type: 'text', text: content }],
+        content: [{
+          type: 'text',
+          text: content
+        } as TextBlock],
       };
       
       // 添加到Claude消息列表
@@ -397,7 +397,7 @@ export default function ChatPage() {
         if (currentSession) {
           const updatedSession = {
             ...currentSession,
-            messages: [...messages, userMessage],
+            blocks: [...messages, userMessage],
             claudeMessages: updatedClaudeMessages,
             tools: tools,
             lastUpdated: new Date(),
@@ -465,7 +465,7 @@ export default function ChatPage() {
           
           const updatedSession = {
             ...currentSession,
-            messages: finalMessages,
+            blocks: finalMessages,
             claudeMessages: updatedMessages,
             tools: tools,
             lastUpdated: new Date(),
@@ -717,22 +717,15 @@ export default function ChatPage() {
           {/* 消息列表 */}
           <div className="flex-1 flex flex-col overflow-hidden">
             <div className="flex-1 overflow-y-auto p-4">
-              {messages.map(message => {
-                // 获取与此消息关联的工具
-                const messageTools = message.toolIds 
-                  ? tools.filter(tool => message.toolIds?.includes(tool.id)) as EnhancedTool[]
-                  : [];
-                
-                return (
-                  <EnhancedChatMessage
-                    key={message.id}
-                    role={message.role}
-                    content={message.content}
-                    timestamp={message.timestamp}
-                    tools={messageTools}
-                  />
-                );
-              })}
+              {messages.map(message => (
+                <BlockBasedChatMessage
+                  key={message.id}
+                  role={message.role}
+                  blocks={message.blocks}
+                  timestamp={message.timestamp}
+                  isLoading={isLoading && message.id === currentResponseId}
+                />
+              ))}
               {isLoading && (
                 <div className="flex justify-center my-4">
                   <div className="animate-pulse flex space-x-2">
