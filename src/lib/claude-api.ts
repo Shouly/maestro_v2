@@ -99,38 +99,61 @@ export class ClaudeApiClient {
         ...extraParams,
       });
 
+      // 打印完整响应，用于调试
+      console.log('Claude API 完整响应:', JSON.stringify(response, null, 2));
+
       // 处理响应
       const responseContentBlocks: ContentBlock[] = [];
       
       // 处理响应内容块
-      for (const block of response.content) {
-        if (block.type === 'text') {
-          // 创建文本块
-          const textBlock: TextBlock = { 
-            type: 'text', 
-            text: block.text 
-          };
-          responseContentBlocks.push(textBlock);
+      if (!response.content || !Array.isArray(response.content)) {
+        console.error('响应内容格式不正确:', response);
+        // 创建一个默认的文本块
+        const defaultTextBlock: TextBlock = { 
+          type: 'text', 
+          text: '响应格式错误，请重试。' 
+        };
+        responseContentBlocks.push(defaultTextBlock);
+        
+        if (onContentBlock) {
+          onContentBlock(defaultTextBlock);
+        }
+      } else {
+        for (const block of response.content) {
+          console.log('处理内容块:', JSON.stringify(block, null, 2));
           
-          // 回调内容块
-          if (onContentBlock) {
-            console.log('发送文本块，长度:', textBlock.text.length);
-            onContentBlock(textBlock);
-          }
-        } else if (block.type === 'tool_use') {
-          // 处理工具使用块
-          const toolUseBlock: ToolUseBlock = {
-            type: 'tool_use',
-            id: block.id,
-            name: block.name,
-            input: block.input as Record<string, any>,
-          };
-          
-          responseContentBlocks.push(toolUseBlock);
-          
-          // 回调内容块
-          if (onContentBlock) {
-            onContentBlock(toolUseBlock);
+          if (block.type === 'text') {
+            // 创建文本块
+            const textBlock: TextBlock = { 
+              type: 'text', 
+              text: block.text 
+            };
+            responseContentBlocks.push(textBlock);
+            
+            // 回调内容块
+            if (onContentBlock) {
+              console.log('发送文本块，长度:', textBlock.text.length);
+              onContentBlock(textBlock);
+            }
+          } else if (block.type === 'tool_use') {
+            // 处理工具使用块
+            console.log('处理工具使用块:', JSON.stringify(block, null, 2));
+            const toolUseBlock: ToolUseBlock = {
+              type: 'tool_use',
+              id: block.id,
+              name: block.name,
+              input: block.input as Record<string, any>,
+            };
+            
+            responseContentBlocks.push(toolUseBlock);
+            
+            // 回调内容块
+            if (onContentBlock) {
+              console.log('发送工具使用块');
+              onContentBlock(toolUseBlock);
+            }
+          } else {
+            console.warn('未知的内容块类型:', (block as any).type);
           }
         }
       }
@@ -189,9 +212,16 @@ export class ClaudeApiClient {
 
             case 'bash':
               // 执行 Bash 命令
-              result = await core.invoke<ToolResult>('execute_bash_command', {
-                args: { ...toolInput }
-              });
+              console.log('执行Bash命令:', JSON.stringify(toolInput, null, 2));
+              try {
+                result = await core.invoke<ToolResult>('execute_bash_command', {
+                  args: { ...toolInput }
+                });
+                console.log('Bash命令执行结果:', JSON.stringify(result, null, 2));
+              } catch (error) {
+                console.error('Bash命令执行失败:', error);
+                throw error;
+              }
               break;
 
             case 'edit':
@@ -317,6 +347,8 @@ export class ClaudeApiClient {
 
   // 创建工具结果块
   private makeToolResultBlock(result: ToolResult, toolUseId: string): ToolResultBlock {
+    console.log('创建工具结果块:', JSON.stringify(result, null, 2));
+    
     const content: (TextBlock | ImageBlock)[] = [];
 
     if (result.output) {
@@ -334,6 +366,24 @@ export class ClaudeApiClient {
           media_type: 'image/png',
           data: result.base64_image,
         },
+      });
+    }
+
+    // 如果没有输出和图像，但有错误，使用错误作为内容
+    if (content.length === 0 && result.error) {
+      return {
+        type: 'tool_result',
+        tool_use_id: toolUseId,
+        content: this.maybePrependSystemToolResult(result, result.error),
+        is_error: true,
+      };
+    }
+    
+    // 如果没有任何内容，添加一个空文本块
+    if (content.length === 0) {
+      content.push({
+        type: 'text',
+        text: this.maybePrependSystemToolResult(result, '命令执行完成，但没有输出'),
       });
     }
 
