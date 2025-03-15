@@ -17,6 +17,7 @@ const { listen } = event;
 import {
   callClaudeAPI,
   Message as ClaudeMessage,
+  ComputerToolOptions,
   ContentBlock,
   TextBlock,
   ThinkingBlock,
@@ -145,12 +146,18 @@ export default function ChatPage() {
 
           console.log('Screen size:', width, 'x', height);
 
-          const options = await invoke('get_computer_options', {
-            args: {
-              width,
-              height
-            }
+          // 获取计算机工具选项
+          const options = await invoke<ComputerToolOptions>('get_computer_options', {
+            width,
+            height
           });
+
+          // 保存到设置中
+          setSettings(prev => ({
+            ...prev,
+            computerToolOptions: options
+          }));
+
           console.log('Computer tool options:', options);
         } catch (error) {
           console.error('Failed to get computer options:', error);
@@ -233,16 +240,14 @@ export default function ChatPage() {
         // 更新现有助手消息
         console.log('更新现有助手消息，ID:', currentResponseId);
         setMessages(prev =>
-          prev.map(m => {
-            if (m.id === currentResponseId) {
-              // 更新文本内容
-              return {
+          prev.map(m =>
+            m.id === currentResponseId
+              ? {
                 ...m,
                 blocks: [...m.blocks.filter(b => b.type !== 'text'), textBlock],
-              };
-            }
-            return m;
-          })
+              }
+              : m
+          )
         );
       }
     } else if (block.type === 'thinking') {
@@ -429,6 +434,7 @@ export default function ChatPage() {
           enableBashTool: settings.enableBashTool,
           enableEditTool: settings.enableEditTool,
           toolVersion: settings.toolVersion,
+          computerToolOptions: settings.computerToolOptions,
         },
         handleContentBlock,
         handleToolResult

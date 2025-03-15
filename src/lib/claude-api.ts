@@ -1,7 +1,6 @@
 import { Anthropic } from '@anthropic-ai/sdk';
 import { core } from '@tauri-apps/api';
 import { ContentBlock, ImageBlock, Message, TextBlock, Tool, ToolResult, ToolResultBlock, ToolUseBlock } from './claude';
-import { v4 as uuidv4 } from 'uuid';
 
 // Claude API 客户端
 export class ClaudeApiClient {
@@ -11,7 +10,7 @@ export class ClaudeApiClient {
     if (!apiKey || apiKey.trim() === '') {
       throw new Error('API 密钥不能为空。请在设置中配置有效的 API 密钥。');
     }
-    
+
     this.client = new Anthropic({
       apiKey: apiKey,
       dangerouslyAllowBrowser: true,
@@ -39,11 +38,27 @@ export class ClaudeApiClient {
     const anthropicMessages = this.convertToAnthropicMessages(messages);
 
     // 准备工具
-    const anthropicTools = tools.length > 0 ? tools.map(tool => ({
-      name: tool.name,
-      description: tool.description,
-      input_schema: tool.input_schema,
-    })) : undefined;
+    const anthropicTools = tools.length > 0 ? tools.map(tool => {
+      // 基本工具定义
+      const toolDef: Record<string, any> = {
+        name: tool.name,
+        description: tool.description,
+        input_schema: tool.input_schema,
+      };
+
+      // 如果是计算机工具且有选项，直接将选项合并到工具定义中
+      if (tool.name === 'computer' && tool.options) {
+        // 直接将选项合并到工具定义中，与Python版本保持一致
+        return {
+          ...toolDef,
+          display_width_px: tool.options.display_width_px,
+          display_height_px: tool.options.display_height_px,
+          display_number: tool.options.display_number,
+        };
+      }
+
+      return toolDef;
+    }) : undefined;
 
     // 准备额外参数
     const extraParams: Record<string, any> = {};
@@ -76,7 +91,7 @@ export class ClaudeApiClient {
         tools: anthropicTools,
         extraParams
       });
-      
+
       // 打印完整的提示词
       console.log('完整提示词:', JSON.stringify({
         model,
@@ -86,7 +101,7 @@ export class ClaudeApiClient {
         tools: anthropicTools,
         ...extraParams
       }, null, 2));
-      
+
       // 调用Claude模型
       const response = await this.client.messages.create({
         model: model,
@@ -102,17 +117,17 @@ export class ClaudeApiClient {
 
       // 处理响应
       const responseContentBlocks: ContentBlock[] = [];
-      
+
       // 处理响应内容块
       if (!response.content || !Array.isArray(response.content)) {
         console.error('响应内容格式不正确:', response);
         // 创建一个默认的文本块
-        const defaultTextBlock: TextBlock = { 
-          type: 'text', 
-          text: '响应格式错误，请重试。' 
+        const defaultTextBlock: TextBlock = {
+          type: 'text',
+          text: '响应格式错误，请重试。'
         };
         responseContentBlocks.push(defaultTextBlock);
-        
+
         if (onContentBlock) {
           onContentBlock(defaultTextBlock);
         }
@@ -125,9 +140,9 @@ export class ClaudeApiClient {
               type: 'text',
               text: block.text
             };
-            
+
             responseContentBlocks.push(textBlock);
-            
+
             // 回调文本块
             if (onContentBlock) {
               console.log('发送文本块，长度:', textBlock.text.length);
@@ -142,9 +157,9 @@ export class ClaudeApiClient {
               name: block.name,
               input: block.input as Record<string, any>,
             };
-            
+
             responseContentBlocks.push(toolUseBlock);
-            
+
             // 回调内容块
             if (onContentBlock) {
               console.log('发送工具使用块');
@@ -188,7 +203,7 @@ export class ClaudeApiClient {
               // 获取屏幕尺寸
               let width = window.screen.width || 1280;
               let height = window.screen.height || 720;
-              
+
               try {
                 const screenSize = await core.invoke<[number, number]>('get_screen_size');
                 if (screenSize) {
@@ -198,30 +213,30 @@ export class ClaudeApiClient {
               } catch (e) {
                 console.warn('Failed to get screen size from Tauri:', e);
               }
-              
+
               // 转换参数格式
               const transformedInput = { ...toolInput };
-              
+
               // 将coordinate数组转换为(x, y)坐标
               if (Array.isArray(transformedInput.coordinate) && transformedInput.coordinate.length === 2) {
                 transformedInput.coordinate = [
-                  transformedInput.coordinate[0], 
+                  transformedInput.coordinate[0],
                   transformedInput.coordinate[1]
                 ];
               }
-              
+
               // 将action名称转换为后端期望的格式
               if (transformedInput.action === 'click') {
                 transformedInput.action = 'left_click';
               } else if (transformedInput.action === 'press') {
                 transformedInput.action = 'key';
               }
-              
+
               console.log('执行计算机操作:', JSON.stringify(transformedInput, null, 2));
-              
+
               // 执行计算机操作
               result = await core.invoke<ToolResult>('execute_computer_command', {
-                args: { 
+                args: {
                   ...transformedInput,
                   width,
                   height
@@ -237,19 +252,19 @@ export class ClaudeApiClient {
                 const bashPromise = core.invoke<ToolResult>('execute_bash_command', {
                   args: { ...toolInput }
                 });
-                
+
                 // 设置超时
                 const timeoutPromise = new Promise<ToolResult>((_, reject) => {
                   setTimeout(() => {
                     reject(new Error('前端超时：Bash 命令执行时间过长'));
                   }, 40000); // 40秒超时
                 });
-                
+
                 // 使用 Promise.race 实现超时
                 result = await Promise.race([bashPromise, timeoutPromise]);
-                
+
                 console.log('Bash命令执行结果:', JSON.stringify(result, null, 2));
-                
+
                 // 检查是否需要重启会话
                 if (result.system && result.system.includes('重启')) {
                   console.log('Bash会话需要重启，自动重启中...');
@@ -265,13 +280,13 @@ export class ClaudeApiClient {
                 }
               } catch (error) {
                 console.error('Bash命令执行失败:', error);
-                
+
                 // 创建错误结果
                 result = {
                   error: `执行Bash命令失败: ${error}`,
                   system: '请尝试使用 restart: true 重启 Bash 会话，或者使用更简单的命令'
                 };
-                
+
                 // 尝试重启会话
                 try {
                   console.log('尝试自动重启Bash会话...');
@@ -288,31 +303,31 @@ export class ClaudeApiClient {
             case 'edit':
               // 转换参数格式
               const transformedEditInput = { ...toolInput };
-              
+
               // 将命令名称转换为后端期望的格式
               if (transformedEditInput.command === 'undo_edit') {
                 transformedEditInput.command = 'undo_edit';
               }
-              
+
               // 将参数名称转换为后端期望的格式
               if (transformedEditInput.file_text !== undefined) {
                 transformedEditInput.file_text = transformedEditInput.file_text;
               }
-              
+
               if (transformedEditInput.old_str !== undefined) {
                 transformedEditInput.old_str = transformedEditInput.old_str;
               }
-              
+
               if (transformedEditInput.new_str !== undefined) {
                 transformedEditInput.new_str = transformedEditInput.new_str;
               }
-              
+
               if (transformedEditInput.insert_line !== undefined) {
                 transformedEditInput.insert_line = transformedEditInput.insert_line;
               }
-              
+
               console.log('执行编辑操作:', JSON.stringify(transformedEditInput, null, 2));
-              
+
               // 执行文件编辑
               result = await core.invoke<ToolResult>('execute_edit_command', {
                 args: { ...transformedEditInput }
@@ -380,7 +395,7 @@ export class ClaudeApiClient {
   private convertToAnthropicMessages(messages: Message[]) {
     // 打印转换前的消息
     console.log('转换前的消息:', JSON.stringify(messages, null, 2));
-    
+
     const convertedMessages = messages.map(message => {
       // 转换消息内容
       const content = message.content.map(block => {
@@ -426,17 +441,17 @@ export class ClaudeApiClient {
         content,
       };
     });
-    
+
     // 打印转换后的消息
     console.log('转换后的消息:', JSON.stringify(convertedMessages, null, 2));
-    
+
     return convertedMessages;
   }
 
   // 创建工具结果块
   private makeToolResultBlock(result: ToolResult, toolUseId: string): ToolResultBlock {
     console.log('创建工具结果块:', JSON.stringify(result, null, 2));
-    
+
     const content: (TextBlock | ImageBlock)[] = [];
 
     if (result.output) {
@@ -466,7 +481,7 @@ export class ClaudeApiClient {
         is_error: true,
       };
     }
-    
+
     // 如果没有任何内容，添加一个空文本块
     if (content.length === 0) {
       content.push({

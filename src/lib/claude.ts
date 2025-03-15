@@ -5,6 +5,13 @@ import { ClaudeApiClient } from './claude-api';
 export type ToolVersion = 'computer_use_20250124' | 'computer_use_20241022';
 export type BetaFlag = 'computer-use-2024-10-22' | 'computer-use-2025-01-24';
 
+// 计算机工具选项接口
+export interface ComputerToolOptions {
+  display_width_px: number;
+  display_height_px: number;
+  display_number?: number;
+}
+
 // 工具组定义
 export interface ToolGroup {
   version: ToolVersion;
@@ -103,6 +110,7 @@ export interface ClaudeConfig {
   tokenEfficientToolsBeta: boolean;
   toolVersion: ToolVersion;
   promptCaching?: boolean;
+  computerToolOptions?: ComputerToolOptions;
 }
 
 // 工具定义
@@ -115,6 +123,7 @@ export interface Tool {
     required?: string[];
     additionalProperties?: boolean;
   };
+  options?: ComputerToolOptions;
 }
 
 // 可用工具
@@ -248,7 +257,14 @@ export async function callClaudeAPI(
   
   // 添加计算机工具
   if (config.enableComputerTool && toolGroup.tools.includes('computer')) {
-    tools.push(COMPUTER_TOOL);
+    const computerTool = { ...COMPUTER_TOOL };
+    
+    // 如果有计算机工具选项，添加到工具中
+    if (config.computerToolOptions) {
+      computerTool.options = config.computerToolOptions;
+    }
+    
+    tools.push(computerTool);
   }
   
   // 添加Bash工具
@@ -266,7 +282,7 @@ export async function callClaudeAPI(
   
   // 准备选项
   const options = {
-    thinkingEnabled: false,
+    thinkingEnabled: config.thinkingEnabled,
     thinkingBudget: config.thinkingBudget,
     onlyNMostRecentImages: config.onlyNMostRecentImages,
     tokenEfficientToolsBeta: config.tokenEfficientToolsBeta,

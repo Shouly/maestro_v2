@@ -3,6 +3,7 @@ import { X, Save, Eye, EyeOff, Info, FileText } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Button } from './Button';
 import LogViewerModal from '../LogViewerModal';
+import { ComputerToolOptions } from '@/lib/claude';
 
 export interface SettingsProps {
   isOpen: boolean;
@@ -14,7 +15,7 @@ export interface SettingsProps {
 
 export interface SettingsData {
   // API配置
-  apiProvider: 'anthropic' | 'bedrock' | 'vertex';
+  apiProvider: 'anthropic' | 'bedrock' | 'vertex' | 'mock';
   apiKey: string;
   modelVersion: string;
   
@@ -40,6 +41,9 @@ export interface SettingsData {
   
   // 界面设置
   theme: 'light' | 'dark' | 'system';
+  
+  // 计算机工具选项
+  computerToolOptions?: ComputerToolOptions;
 }
 
 export const SettingsPanel: React.FC<SettingsProps> = ({
@@ -112,6 +116,7 @@ export const SettingsPanel: React.FC<SettingsProps> = ({
                 <option value="anthropic">Anthropic</option>
                 <option value="bedrock">AWS Bedrock</option>
                 <option value="vertex">Google Vertex AI</option>
+                <option value="mock">Mock</option>
               </select>
             </div>
             
