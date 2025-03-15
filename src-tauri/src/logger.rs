@@ -64,11 +64,6 @@ pub fn init() {
     });
 }
 
-/// 获取日志目录路径
-pub fn get_log_dir() -> String {
-    LOG_DIR.to_string()
-}
-
 /// 获取当前日志文件路径
 pub fn get_current_log_file() -> String {
     let date = Local::now().format("%Y-%m-%d").to_string();
