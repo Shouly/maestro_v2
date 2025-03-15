@@ -87,7 +87,7 @@ export class ClaudeApiClient {
         ...extraParams
       }, null, 2));
       
-      // 使用非流式响应
+      // 调用Claude模型
       const response = await this.client.messages.create({
         model: model,
         max_tokens: Math.min(maxTokens, 64000),
