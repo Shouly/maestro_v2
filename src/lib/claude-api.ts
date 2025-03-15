@@ -91,6 +91,20 @@ export class ClaudeApiClient {
 
       // 处理响应
       const responseContentBlocks: ContentBlock[] = [];
+      let lastCallbackTime = 0;
+      let accumulatedText = '';
+      const MIN_CALLBACK_INTERVAL = 100; // 最小回调间隔（毫秒）
+      const MIN_TEXT_LENGTH_FOR_CALLBACK = 10; // 累积多少字符才触发回调
+      
+      // 创建初始文本块并发送一次回调，确保UI创建一个消息块
+      const initialTextBlock: TextBlock = { type: 'text', text: '' };
+      responseContentBlocks.push(initialTextBlock);
+      
+      // 发送初始回调，确保UI创建一个消息块
+      if (onContentBlock) {
+        onContentBlock({ ...initialTextBlock });
+        lastCallbackTime = Date.now();
+      }
       
       // 收集完整响应
       for await (const chunk of stream) {
@@ -99,22 +113,30 @@ export class ClaudeApiClient {
           
           // 处理文本块
           if (delta.type === 'text_delta') {
-            // 查找或创建文本块
+            // 查找或创建文本块 - 应该始终使用第一个文本块
             let textBlock = responseContentBlocks.find(
               block => block.type === 'text'
             ) as TextBlock | undefined;
             
+            // 这里应该不需要创建新的文本块，因为我们已经在流式处理开始时创建了一个
             if (!textBlock) {
-              textBlock = { type: 'text', text: '' };
-              responseContentBlocks.push(textBlock);
+              console.error('未找到文本块，这不应该发生');
+              textBlock = initialTextBlock;
             }
             
             // 更新文本内容
             textBlock.text += delta.text;
+            accumulatedText += delta.text;
             
-            // 回调内容块
-            if (onContentBlock) {
+            // 控制回调频率，避免过于频繁的更新
+            const now = Date.now();
+            if (onContentBlock && 
+                (now - lastCallbackTime > MIN_CALLBACK_INTERVAL && accumulatedText.length >= MIN_TEXT_LENGTH_FOR_CALLBACK || 
+                 delta.text.includes('\n'))) { // 遇到换行符时触发回调
+              console.log('发送文本块更新，长度:', textBlock.text.length);
               onContentBlock({ ...textBlock });
+              lastCallbackTime = now;
+              accumulatedText = '';
             }
           }
         } else if (chunk.type === 'content_block_start' && chunk.content_block.type === 'tool_use') {
@@ -133,6 +155,18 @@ export class ClaudeApiClient {
           if (onContentBlock) {
             onContentBlock(toolUseBlock);
           }
+        }
+      }
+
+      // 确保最后一次回调，处理所有剩余文本
+      if (accumulatedText.length > 0 && onContentBlock) {
+        const textBlock = responseContentBlocks.find(
+          block => block.type === 'text'
+        ) as TextBlock | undefined;
+        
+        if (textBlock) {
+          console.log('发送最终文本块更新，长度:', textBlock.text.length);
+          onContentBlock({ ...textBlock });
         }
       }
 

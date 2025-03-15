@@ -214,8 +214,10 @@ export default function ChatPage() {
       const existingMessage = messages.find(m => m.role === 'assistant' && m.id === currentResponseId);
       
       if (!existingMessage) {
-        // 创建新的助手消息，使用唯一ID
-        const responseId = `response-${uuidv4()}`;
+        // 如果没有当前响应ID或找不到对应消息，创建新的助手消息
+        // 使用固定的临时ID，而不是每次都生成新ID
+        const responseId = currentResponseId || `response-${uuidv4()}`;
+        console.log('创建新的助手消息，ID:', responseId);
         setCurrentResponseId(responseId);
         
         const assistantMessage: Message = {
@@ -226,9 +228,26 @@ export default function ChatPage() {
         };
         
         // 添加到消息列表
-        setMessages(prev => [...prev, assistantMessage]);
+        setMessages(prev => {
+          // 检查是否已经有相同ID的消息
+          const hasMessage = prev.some(m => m.id === responseId);
+          if (hasMessage) {
+            console.log('已存在相同ID的消息，更新它:', responseId);
+            // 如果已经有相同ID的消息，更新它
+            return prev.map(m => 
+              m.id === responseId 
+                ? { ...m, content: textBlock.text } 
+                : m
+            );
+          } else {
+            console.log('添加新消息，ID:', responseId);
+            // 否则添加新消息
+            return [...prev, assistantMessage];
+          }
+        });
       } else {
         // 更新现有助手消息
+        console.log('更新现有助手消息，ID:', currentResponseId);
         setMessages(prev => 
           prev.map(m => 
             m.id === currentResponseId 
@@ -291,6 +310,7 @@ export default function ChatPage() {
     // 设置处理状态和重置当前响应ID
     setIsProcessing(true);
     setCurrentResponseId(null);
+    console.log('发送新消息，重置currentResponseId为null');
     
     // 检查 API 密钥是否已设置
     if (!settings.apiKey || settings.apiKey.trim() === '') {
@@ -379,13 +399,17 @@ export default function ChatPage() {
       setClaudeMessages(updatedMessages);
       
       // 完成对话后，将临时消息ID替换为永久ID
-      setMessages(prev => 
-        prev.map(m => 
-          m.id === currentResponseId 
-            ? { ...m, id: uuidv4() } 
-            : m
-        ) as Message[]
-      );
+      if (currentResponseId) {
+        console.log('对话完成，将临时ID替换为永久ID:', currentResponseId);
+        const permanentId = uuidv4();
+        setMessages(prev => 
+          prev.map(m => 
+            m.id === currentResponseId 
+              ? { ...m, id: permanentId } 
+              : m
+          ) as Message[]
+        );
+      }
       
       // 重置当前响应ID
       setCurrentResponseId(null);
@@ -397,11 +421,8 @@ export default function ChatPage() {
       if (currentSessionId) {
         const currentSession = sessions.find(s => s.id === currentSessionId);
         if (currentSession) {
-          const finalMessages = messages.map(m => 
-            m.id === currentResponseId 
-              ? { ...m, id: uuidv4() } 
-              : m
-          ) as Message[];
+          // 不需要再次替换ID，因为我们已经在前面替换过了
+          const finalMessages = messages;
           
           const updatedSession = {
             ...currentSession,
