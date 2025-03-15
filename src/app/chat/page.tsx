@@ -11,6 +11,9 @@ import { ToolOutput } from '@/components/ui/ToolOutput';
 import { Menu, MessageSquare, Plus, Sparkles } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import { v4 as uuidv4 } from 'uuid';
+import { core, event } from '@tauri-apps/api';
+const { invoke } = core;
+const { listen } = event;
 
 // 消息类型
 interface Message {
@@ -26,7 +29,16 @@ interface Tool {
   type: 'command' | 'screenshot' | 'code' | 'file' | 'success' | 'error' | 'info';
   title: string;
   content: string;
+  imageData?: string; // Base64 编码的图像数据
   timestamp: Date;
+}
+
+// 工具结果类型
+interface ToolResult {
+  output?: string;
+  error?: string;
+  base64_image?: string;
+  system?: string;
 }
 
 export default function ChatPage() {
@@ -71,41 +83,75 @@ export default function ChatPage() {
 
   // 初始化
   useEffect(() => {
-    // 这里应该从本地存储加载会话和设置
-    // 示例数据
-    const demoSessions: ChatSession[] = [
-      {
-        id: '1',
-        title: '示例会话',
-        lastMessage: '这是一个示例会话',
-        timestamp: new Date(),
-        isActive: true,
-      }
-    ];
+    // 从本地存储加载会话和设置
+    const loadSavedData = async () => {
+      try {
+        // 这里应该从本地存储加载会话和设置
+        // 示例数据
+        const demoSessions: ChatSession[] = [
+          {
+            id: '1',
+            title: '新会话',
+            lastMessage: '欢迎使用 Maestro',
+            timestamp: new Date(),
+            isActive: true,
+          }
+        ];
+    
+        setSessions(demoSessions);
+        setCurrentSessionId('1');
+    
+        // 添加欢迎消息
+        setMessages([
+          {
+            id: uuidv4(),
+            role: 'assistant',
+            content: '你好！我是 Maestro，你的 AI 助手。我可以帮助你控制计算机、执行命令和编辑文件。请告诉我你需要什么帮助？',
+            timestamp: new Date(),
+          }
+        ]);
 
-    setSessions(demoSessions);
-    setCurrentSessionId('1');
-
-    // 添加欢迎消息
-    setMessages([
-      {
-        id: uuidv4(),
-        role: 'assistant',
-        content: '你好！我是 Maestro，你的 AI 助手。我可以帮助你控制计算机、执行命令和编辑文件。请告诉我你需要什么帮助？',
-        timestamp: new Date(),
+        // 获取计算机工具配置
+        try {
+          const options = await invoke('get_computer_options');
+          console.log('Computer tool options:', options);
+        } catch (error) {
+          console.error('Failed to get computer options:', error);
+        }
+      } catch (error) {
+        console.error('Failed to load saved data:', error);
       }
-    ]);
+    };
+
+    loadSavedData();
+
+    // 设置事件监听器
+    const unlistenFns: (() => void)[] = [];
+
+    const setupListeners = async () => {
+      // 监听工具执行结果
+      const unlisten = await listen('tool_result', (event) => {
+        console.log('Tool result:', event);
+        // 处理工具执行结果
+      });
+      unlistenFns.push(unlisten);
+    };
+
+    setupListeners();
+
+    // 清理函数
+    return () => {
+      unlistenFns.forEach(fn => fn());
+    };
   }, []);
 
   // 滚动到最新消息
   useEffect(() => {
-    if (messagesEndRef.current) {
-      messagesEndRef.current.scrollIntoView({ behavior: 'smooth' });
-    }
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages, tools]);
 
-  // 处理发送消息
-  const handleSendMessage = (content: string) => {
+  // 发送消息
+  const handleSendMessage = async (content: string) => {
     if (!content.trim()) return;
 
     // 添加用户消息
@@ -117,44 +163,223 @@ export default function ChatPage() {
     };
 
     setMessages(prev => [...prev, userMessage]);
-
-    // 模拟 AI 响应
     setIsLoading(true);
 
-    // 这里应该调用 API
-    setTimeout(() => {
-      const assistantMessage: Message = {
-        id: uuidv4(),
-        role: 'assistant',
-        content: '我收到了你的消息。这是一个示例响应，实际应用中会调用 Claude API 获取回复。',
-        timestamp: new Date(),
-      };
-
-      setMessages(prev => [...prev, assistantMessage]);
-
-      // 模拟工具输出
-      const toolOutput: Tool = {
-        id: uuidv4(),
-        type: 'info',
-        title: '系统信息',
-        content: '这是一个示例工具输出。在实际应用中，这里会显示工具执行的结果。',
-        timestamp: new Date(),
-      };
-
-      setTools(prev => [...prev, toolOutput]);
-      setIsLoading(false);
-
-      // 更新会话列表
+    try {
+      // 更新会话最后一条消息
       if (currentSessionId) {
-        setSessions(prev =>
-          prev.map(session =>
-            session.id === currentSessionId
-              ? { ...session, lastMessage: content }
+        setSessions(prev => 
+          prev.map(session => 
+            session.id === currentSessionId 
+              ? { ...session, lastMessage: content, timestamp: new Date() } 
               : session
           )
         );
       }
-    }, 1500);
+
+      // 这里应该调用 Claude API 或模拟响应
+      // 模拟 AI 响应
+      setTimeout(async () => {
+        // 模拟工具调用
+        if (content.toLowerCase().includes('截图') || content.toLowerCase().includes('屏幕')) {
+          // 执行截图命令
+          try {
+            const result = await invoke<ToolResult>('take_screenshot');
+            
+            if (result.base64_image) {
+              // 添加截图工具输出
+              const toolOutput: Tool = {
+                id: uuidv4(),
+                type: 'screenshot',
+                title: '屏幕截图',
+                content: '截取了当前屏幕',
+                imageData: result.base64_image,
+                timestamp: new Date(),
+              };
+              
+              setTools(prev => [...prev, toolOutput]);
+            }
+            
+            if (result.error) {
+              // 添加错误工具输出
+              const errorOutput: Tool = {
+                id: uuidv4(),
+                type: 'error',
+                title: '截图错误',
+                content: result.error,
+                timestamp: new Date(),
+              };
+              
+              setTools(prev => [...prev, errorOutput]);
+            }
+          } catch (error) {
+            console.error('Screenshot error:', error);
+            
+            // 添加错误工具输出
+            const errorOutput: Tool = {
+              id: uuidv4(),
+              type: 'error',
+              title: '截图错误',
+              content: String(error),
+              timestamp: new Date(),
+            };
+            
+            setTools(prev => [...prev, errorOutput]);
+          }
+        } else if (content.toLowerCase().includes('bash') || content.toLowerCase().includes('命令') || content.toLowerCase().includes('执行')) {
+          // 执行 Bash 命令
+          try {
+            // 从消息中提取命令（简化示例）
+            const commandMatch = content.match(/执行[：:]\s*(.+)/) || content.match(/运行[：:]\s*(.+)/);
+            const command = commandMatch ? commandMatch[1].trim() : 'echo "Hello from Bash"';
+            
+            // 添加命令工具输出
+            const commandOutput: Tool = {
+              id: uuidv4(),
+              type: 'command',
+              title: '执行命令',
+              content: command,
+              timestamp: new Date(),
+            };
+            
+            setTools(prev => [...prev, commandOutput]);
+            
+            // 调用 Bash 工具
+            const result = await invoke<ToolResult>('execute_bash_command', {
+              args: { command, restart: false }
+            });
+            
+            if (result.output) {
+              // 添加成功工具输出
+              const successOutput: Tool = {
+                id: uuidv4(),
+                type: 'success',
+                title: '命令输出',
+                content: result.output,
+                timestamp: new Date(),
+              };
+              
+              setTools(prev => [...prev, successOutput]);
+            }
+            
+            if (result.error) {
+              // 添加错误工具输出
+              const errorOutput: Tool = {
+                id: uuidv4(),
+                type: 'error',
+                title: '命令错误',
+                content: result.error,
+                timestamp: new Date(),
+              };
+              
+              setTools(prev => [...prev, errorOutput]);
+            }
+          } catch (error) {
+            console.error('Bash command error:', error);
+            
+            // 添加错误工具输出
+            const errorOutput: Tool = {
+              id: uuidv4(),
+              type: 'error',
+              title: '命令错误',
+              content: String(error),
+              timestamp: new Date(),
+            };
+            
+            setTools(prev => [...prev, errorOutput]);
+          }
+        } else if (content.toLowerCase().includes('文件') || content.toLowerCase().includes('编辑')) {
+          // 执行文件编辑命令
+          try {
+            // 从消息中提取路径（简化示例）
+            const pathMatch = content.match(/文件[：:]\s*(.+)/) || content.match(/路径[：:]\s*(.+)/);
+            const path = pathMatch ? pathMatch[1].trim() : '/tmp/example.txt';
+            
+            // 添加文件工具输出
+            const fileOutput: Tool = {
+              id: uuidv4(),
+              type: 'file',
+              title: '查看文件',
+              content: path,
+              timestamp: new Date(),
+            };
+            
+            setTools(prev => [...prev, fileOutput]);
+            
+            // 调用编辑工具
+            const result = await invoke<ToolResult>('execute_edit_command', {
+              args: { 
+                command: 'view',
+                path,
+              }
+            });
+            
+            if (result.output) {
+              // 添加成功工具输出
+              const successOutput: Tool = {
+                id: uuidv4(),
+                type: 'code',
+                title: '文件内容',
+                content: result.output,
+                timestamp: new Date(),
+              };
+              
+              setTools(prev => [...prev, successOutput]);
+            }
+            
+            if (result.error) {
+              // 添加错误工具输出
+              const errorOutput: Tool = {
+                id: uuidv4(),
+                type: 'error',
+                title: '文件错误',
+                content: result.error,
+                timestamp: new Date(),
+              };
+              
+              setTools(prev => [...prev, errorOutput]);
+            }
+          } catch (error) {
+            console.error('File edit error:', error);
+            
+            // 添加错误工具输出
+            const errorOutput: Tool = {
+              id: uuidv4(),
+              type: 'error',
+              title: '文件错误',
+              content: String(error),
+              timestamp: new Date(),
+            };
+            
+            setTools(prev => [...prev, errorOutput]);
+          }
+        }
+
+        // 添加 AI 响应
+        const assistantMessage: Message = {
+          id: uuidv4(),
+          role: 'assistant',
+          content: `我已经处理了你的请求："${content}"。请查看工具输出区域获取结果。`,
+          timestamp: new Date(),
+        };
+
+        setMessages(prev => [...prev, assistantMessage]);
+        setIsLoading(false);
+      }, 1500);
+    } catch (error) {
+      console.error('Error processing message:', error);
+      
+      // 添加错误消息
+      const errorMessage: Message = {
+        id: uuidv4(),
+        role: 'assistant',
+        content: `处理消息时出错: ${error}`,
+        timestamp: new Date(),
+      };
+      
+      setMessages(prev => [...prev, errorMessage]);
+      setIsLoading(false);
+    }
   };
 
   // 创建新会话
@@ -162,72 +387,74 @@ export default function ChatPage() {
     const newSession: ChatSession = {
       id: uuidv4(),
       title: `新会话 ${sessions.length + 1}`,
+      lastMessage: '新建会话',
       timestamp: new Date(),
       isActive: true,
     };
 
-    setSessions(prev => prev.map(s => ({ ...s, isActive: false })).concat([newSession]));
+    setSessions(prev => prev.map(s => ({ ...s, isActive: false })).concat(newSession));
     setCurrentSessionId(newSession.id);
     setMessages([]);
     setTools([]);
-    setSidebarOpen(false); // 移动端创建新会话后关闭侧边栏
   };
 
   // 选择会话
   const handleSelectSession = (sessionId: string) => {
-    setCurrentSessionId(sessionId);
-    setSessions(prev =>
+    if (sessionId === currentSessionId) return;
+
+    // 这里应该保存当前会话的消息和工具输出
+    // 然后加载选定会话的消息和工具输出
+
+    setSessions(prev => 
       prev.map(session => ({
         ...session,
         isActive: session.id === sessionId,
       }))
     );
-
-    // 这里应该加载选定会话的消息
-    // 示例
-    if (sessionId === '1') {
-      setMessages([
-        {
-          id: uuidv4(),
-          role: 'assistant',
-          content: '你好！我是 Maestro，你的 AI 助手。我可以帮助你控制计算机、执行命令和编辑文件。请告诉我你需要什么帮助？',
-          timestamp: new Date(),
-        }
-      ]);
-      setTools([]);
-    } else {
-      setMessages([]);
-      setTools([]);
-    }
-
-    setSidebarOpen(false); // 移动端选择会话后关闭侧边栏
+    
+    setCurrentSessionId(sessionId);
+    
+    // 模拟加载会话数据
+    setMessages([
+      {
+        id: uuidv4(),
+        role: 'assistant',
+        content: '已加载会话。我可以继续帮助你吗？',
+        timestamp: new Date(),
+      }
+    ]);
+    
+    setTools([]);
   };
 
   // 删除会话
   const handleDeleteSession = (sessionId: string) => {
-    setSessions(prev => prev.filter(session => session.id !== sessionId));
-
-    if (currentSessionId === sessionId) {
-      const remainingSessions = sessions.filter(session => session.id !== sessionId);
+    // 如果删除当前会话，选择另一个会话
+    if (sessionId === currentSessionId) {
+      const remainingSessions = sessions.filter(s => s.id !== sessionId);
       if (remainingSessions.length > 0) {
         setCurrentSessionId(remainingSessions[0].id);
-        setSessions(prev =>
-          prev.map((session, index) =>
-            index === 0 ? { ...session, isActive: true } : session
-          ).filter(session => session.id !== sessionId)
+        setSessions(prev => 
+          prev
+            .filter(s => s.id !== sessionId)
+            .map((s, i) => i === 0 ? { ...s, isActive: true } : s)
         );
       } else {
-        setCurrentSessionId(null);
+        // 如果没有剩余会话，创建一个新会话
+        handleCreateSession();
+        setSessions(prev => prev.filter(s => s.id !== sessionId));
       }
+    } else {
+      setSessions(prev => prev.filter(s => s.id !== sessionId));
     }
   };
 
   // 重命名会话
   const handleRenameSession = (sessionId: string, newTitle: string) => {
-    setSessions(prev =>
-      prev.map(session =>
-        session.id === sessionId
-          ? { ...session, title: newTitle }
+    setSessions(prev => 
+      prev.map(session => 
+        session.id === sessionId 
+          ? { ...session, title: newTitle } 
           : session
       )
     );
@@ -235,213 +462,178 @@ export default function ChatPage() {
 
   // 导出会话
   const handleExportSession = (sessionId: string) => {
-    // 这里应该实现导出功能
-    console.log(`导出会话 ${sessionId}`);
+    // 导出会话数据
+    const sessionToExport = sessions.find(s => s.id === sessionId);
+    if (!sessionToExport) return;
+    
+    // 这里应该实现导出逻辑
+    console.log('Exporting session:', sessionToExport);
   };
 
   // 保存设置
   const handleSaveSettings = (newSettings: SettingsData) => {
     setSettings(newSettings);
+    setSettingsOpen(false);
+    
     // 这里应该保存设置到本地存储
+    console.log('Saving settings:', newSettings);
   };
 
   // 切换侧边栏
   const toggleSidebar = () => {
-    setSidebarOpen(!sidebarOpen);
+    setSidebarOpen(prev => !prev);
   };
 
   return (
-    <div className="flex flex-col h-screen bg-[hsl(var(--background))]">
+    <div className="flex h-screen bg-[hsl(var(--background))]">
+      {/* 侧边栏 */}
+      <div className={`fixed inset-0 z-40 lg:relative lg:z-0 lg:w-80 transform transition-transform duration-300 ease-in-out ${sidebarOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'} bg-[hsl(var(--card))] border-r border-[hsl(var(--border))]`}>
+        <div className="flex flex-col h-full">
+          <div className="p-4 border-b border-[hsl(var(--border))]">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center">
+                <Sparkles className="h-5 w-5 text-[hsl(var(--primary))] mr-2" />
+                <h1 className="text-lg font-semibold">Maestro</h1>
+              </div>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="lg:hidden"
+                onClick={toggleSidebar}
+              >
+                <Menu className="h-5 w-5" />
+              </Button>
+            </div>
+          </div>
+          
+          <div className="p-4">
+            <Button
+              variant="gradient"
+              className="w-full justify-start"
+              onClick={handleCreateSession}
+            >
+              <Plus className="h-4 w-4 mr-2" />
+              新会话
+            </Button>
+          </div>
+          
+          <div className="flex-1 overflow-y-auto p-2">
+            <ChatSessionList
+              sessions={sessions}
+              onSelectSession={handleSelectSession}
+              onDeleteSession={handleDeleteSession}
+              onRenameSession={handleRenameSession}
+              onExportSession={handleExportSession}
+              onCreateSession={handleCreateSession}
+            />
+          </div>
+          
+          <div className="p-4 border-t border-[hsl(var(--border))]">
+            <Button
+              variant="outline"
+              className="w-full justify-start"
+              onClick={() => setSettingsOpen(true)}
+            >
+              <svg className="h-4 w-4 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+              </svg>
+              设置
+            </Button>
+          </div>
+        </div>
+      </div>
+      
       {/* 主内容区 */}
-      <div className="flex flex-1 overflow-hidden relative">
-        {/* 左侧主导航菜单 - 桌面版 */}
-        <MainNavigation
-          currentPath="/chat"
-          onOpenSettings={() => setSettingsOpen(true)}
-        />
-
-        {/* 左侧主导航菜单 - 移动版 */}
+      <div className="flex-1 flex flex-col h-full overflow-hidden">
+        {/* 移动导航 */}
         <MobileNavigation
           isOpen={sidebarOpen}
           onClose={() => setSidebarOpen(false)}
           currentPath="/chat"
-          onOpenSettings={() => {
-            setSettingsOpen(true);
-            setSidebarOpen(false);
-          }}
+          onOpenSettings={() => setSettingsOpen(true)}
         />
-
-        {/* 侧边栏背景遮罩 */}
-        {sidebarOpen && (
-          <div
-            className="fixed inset-0 z-30 bg-black/50 md:hidden"
-            onClick={toggleSidebar}
-          />
-        )}
-
-        {/* 右侧内容区 */}
+        
+        {/* 桌面导航 */}
+        <MainNavigation
+          currentPath="/chat"
+          onOpenSettings={() => setSettingsOpen(true)}
+        />
+        
+        {/* 聊天区域 */}
         <div className="flex-1 flex overflow-hidden">
-          {/* 会话列表区域 */}
-          <div className="w-64 border-r bg-[hsl(var(--card))] hidden md:flex md:flex-col">
-            <div className="p-4 border-b flex justify-between items-center">
-              <h2 className="text-sm font-semibold flex items-center">
-                <MessageSquare className="w-4 h-4 mr-2" />
-                会话列表
-              </h2>
-              <Button
-                variant="ghost"
-                size="icon"
-                onClick={handleCreateSession}
-                className="h-7 w-7"
-              >
-                <Plus className="w-4 h-4" />
-              </Button>
-            </div>
-
-            <div className="flex-1 overflow-y-auto p-3">
-              <ChatSessionList
-                sessions={sessions}
-                onSelectSession={handleSelectSession}
-                onCreateSession={handleCreateSession}
-                onDeleteSession={handleDeleteSession}
-                onRenameSession={handleRenameSession}
-                onExportSession={handleExportSession}
-              />
-            </div>
-          </div>
-
-          {/* 对话内容区域 */}
+          {/* 消息列表 */}
           <div className="flex-1 flex flex-col overflow-hidden">
-            {/* 对话标题栏 */}
-            <div className="flex items-center justify-between px-4 py-3 border-b bg-[hsl(var(--background))] shadow-sm">
-              <div className="flex items-center">
-                {/* 移动端侧边栏按钮 */}
-                <button
-                  className="mr-3 p-1 rounded-md hover:bg-[hsl(var(--accent))] md:hidden"
-                  onClick={toggleSidebar}
-                  aria-label="打开侧边栏"
-                >
-                  <Menu className="w-5 h-5" />
-                </button>
-
-                <h1 className="text-lg font-semibold">
-                  {currentSessionId
-                    ? sessions.find(s => s.id === currentSessionId)?.title || '对话'
-                    : '对话'}
-                </h1>
-              </div>
-
-              {/* 移动端快捷操作 */}
-              <div className="flex items-center space-x-2">
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  onClick={handleCreateSession}
-                  className="h-8 w-8 md:hidden"
-                  aria-label="新建会话"
-                >
-                  <Plus className="w-4 h-4" />
-                </Button>
-
-                {/* 会话列表切换按钮 - 仅在中等屏幕上显示 */}
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => {/* 这里应该添加切换会话列表的逻辑 */ }}
-                  className="hidden md:flex items-center"
-                >
-                  <MessageSquare className="w-4 h-4 mr-1.5" />
-                  <span>会话</span>
-                </Button>
-              </div>
-            </div>
-
-            {/* 消息列表 */}
-            <div className="flex-1 overflow-y-auto p-4 md:p-6 bg-[hsl(var(--background))]">
-              {messages.length === 0 && tools.length === 0 ? (
-                <div className="h-full flex flex-col items-center justify-center text-center p-8">
-                  <div className="w-16 h-16 rounded-full bg-[hsl(var(--primary))/10] flex items-center justify-center mb-4">
-                    <Sparkles className="w-8 h-8 text-[hsl(var(--primary))]" />
-                  </div>
-                  <h2 className="text-2xl font-bold mb-2">欢迎使用 Maestro</h2>
-                  <p className="text-[hsl(var(--muted-foreground))] max-w-md mb-8">
-                    我是您的 AI 助手，可以帮助您控制计算机、执行命令和编辑文件。请告诉我您需要什么帮助？
-                  </p>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3 w-full max-w-lg">
-                    <div className="p-3 border rounded-lg hover:bg-[hsl(var(--accent))] cursor-pointer transition-colors">
-                      "截取当前屏幕并分析内容"
-                    </div>
-                    <div className="p-3 border rounded-lg hover:bg-[hsl(var(--accent))] cursor-pointer transition-colors">
-                      "帮我整理桌面文件"
-                    </div>
-                    <div className="p-3 border rounded-lg hover:bg-[hsl(var(--accent))] cursor-pointer transition-colors">
-                      "查找并删除重复文件"
-                    </div>
-                    <div className="p-3 border rounded-lg hover:bg-[hsl(var(--accent))] cursor-pointer transition-colors">
-                      "帮我编写一个简单的脚本"
-                    </div>
+            <div className="flex-1 overflow-y-auto p-4">
+              {messages.map(message => (
+                <ChatMessage
+                  key={message.id}
+                  role={message.role}
+                  content={message.content}
+                  timestamp={message.timestamp}
+                />
+              ))}
+              {isLoading && (
+                <div className="flex justify-center my-4">
+                  <div className="animate-pulse flex space-x-2">
+                    <div className="h-2 w-2 bg-[hsl(var(--primary))] rounded-full"></div>
+                    <div className="h-2 w-2 bg-[hsl(var(--primary))] rounded-full"></div>
+                    <div className="h-2 w-2 bg-[hsl(var(--primary))] rounded-full"></div>
                   </div>
                 </div>
-              ) : (
-                <>
-                  {messages.map(message => (
-                    <ChatMessage
-                      key={message.id}
-                      role={message.role}
-                      content={message.content}
-                      timestamp={message.timestamp}
-                    />
-                  ))}
-
-                  {isLoading && (
-                    <ChatMessage
-                      role="assistant"
-                      content=""
-                      isLoading={true}
-                    />
-                  )}
-
-                  {/* 工具输出 */}
-                  {tools.map(tool => (
-                    <ToolOutput
-                      key={tool.id}
-                      type={tool.type}
-                      title={tool.title}
-                      content={tool.content}
-                      timestamp={tool.timestamp}
-                    />
-                  ))}
-
-                  {/* 用于自动滚动的空div */}
-                  <div ref={messagesEndRef} />
-                </>
               )}
+              <div ref={messagesEndRef} />
             </div>
-
+            
             {/* 输入区域 */}
-            <div className="p-4 border-t bg-[hsl(var(--background))] shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.05)]">
+            <div className="p-4 border-t border-[hsl(var(--border))]">
               <ChatInput
                 onSend={handleSendMessage}
                 isLoading={isLoading}
-                placeholder="输入消息或指令..."
+                placeholder="输入消息..."
               />
-              <div className="flex justify-center mt-2">
-                <span className="text-xs text-[hsl(var(--muted-foreground))] flex items-center">
-                  <Sparkles className="w-3 h-3 mr-1" />
-                  由 Claude AI 提供支持
-                </span>
+            </div>
+          </div>
+          
+          {/* 工具输出区域 */}
+          <div className="hidden lg:flex lg:w-96 border-l border-[hsl(var(--border))] flex-col overflow-hidden">
+            <div className="p-4 border-b border-[hsl(var(--border))]">
+              <div className="flex items-center">
+                <svg className="h-5 w-5 text-[hsl(var(--primary))] mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 3v2m6-2v2M9 19v2m6-2v2M5 9H3m2 6H3m18-6h-2m2 6h-2M7 19h10a2 2 0 002-2V7a2 2 0 00-2-2H7a2 2 0 00-2 2v10a2 2 0 002 2zM9 9h6v6H9V9z" />
+                </svg>
+                <h2 className="text-lg font-semibold">工具输出</h2>
               </div>
+            </div>
+            
+            <div className="flex-1 overflow-y-auto p-4">
+              {tools.length === 0 ? (
+                <div className="flex flex-col items-center justify-center h-full text-[hsl(var(--muted-foreground))]">
+                  <MessageSquare className="h-12 w-12 mb-4 opacity-20" />
+                  <p className="text-center">工具输出将显示在这里</p>
+                </div>
+              ) : (
+                tools.map(tool => (
+                  <ToolOutput
+                    key={tool.id}
+                    type={tool.type}
+                    title={tool.title}
+                    content={tool.content}
+                    timestamp={tool.timestamp}
+                  />
+                ))
+              )}
             </div>
           </div>
         </div>
       </div>
-
+      
       {/* 设置面板 */}
       <SettingsPanel
         isOpen={settingsOpen}
         onClose={() => setSettingsOpen(false)}
-        onSave={handleSaveSettings}
         initialSettings={settings}
+        onSave={handleSaveSettings}
       />
     </div>
   );
