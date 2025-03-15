@@ -4,91 +4,91 @@
 
 @layer base {
   :root {
-    /* 简洁优雅的明亮主题 */
-    --background: 0 0% 100%;
-    --foreground: 240 10% 20%;
+    /* 极简配色：只使用 #126dff、白色和黑色 */
+    --background: 0 0% 100%; /* 纯白色 */
+    --foreground: 0 0% 10%; /* 近黑色 */
 
-    --card: 0 0% 100%;
-    --card-foreground: 240 10% 20%;
+    --card: 0 0% 100%; /* 纯白色 */
+    --card-foreground: 0 0% 10%; /* 近黑色 */
 
-    --popover: 0 0% 100%;
-    --popover-foreground: 240 10% 20%;
+    --popover: 0 0% 100%; /* 纯白色 */
+    --popover-foreground: 0 0% 10%; /* 近黑色 */
 
-    /* 主色调：优雅的深蓝色 */
-    --primary: 220 70% 40%;
-    --primary-foreground: 0 0% 100%;
+    /* 主色调：#126dff 蓝色 (HSL: 217 100% 54%) */
+    --primary: 217 100% 54%;
+    --primary-foreground: 0 0% 100%; /* 纯白色 */
 
-    /* 次要色调：柔和的浅灰色 */
-    --secondary: 220 20% 96%;
-    --secondary-foreground: 240 10% 20%;
+    /* 次要色调：浅灰色 */
+    --secondary: 0 0% 96%;
+    --secondary-foreground: 0 0% 10%; /* 近黑色 */
 
     /* 中性灰 */
-    --muted: 220 20% 96%;
-    --muted-foreground: 240 10% 50%;
+    --muted: 0 0% 96%;
+    --muted-foreground: 0 0% 45%;
 
-    /* 强调色：柔和的蓝灰色 */
-    --accent: 220 30% 70%;
-    --accent-foreground: 0 0% 100%;
+    /* 强调色：同样使用主蓝色 */
+    --accent: 217 100% 54%;
+    --accent-foreground: 0 0% 100%; /* 纯白色 */
 
     /* 警告红 */
-    --destructive: 0 70% 50%;
-    --destructive-foreground: 0 0% 100%;
+    --destructive: 0 100% 50%;
+    --destructive-foreground: 0 0% 100%; /* 纯白色 */
 
     /* 边框和输入框 */
-    --border: 220 20% 90%;
-    --input: 220 20% 90%;
-    --ring: 220 70% 40%;
+    --border: 0 0% 90%;
+    --input: 0 0% 90%;
+    --ring: 217 100% 54%; /* #126dff */
 
     /* 圆角 */
     --radius: 0.375rem;
 
-    /* 阴影效果 - 更加柔和 */
-    --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.03);
-    --shadow: 0 4px 8px rgba(0, 0, 0, 0.05);
-    --shadow-md: 0 6px 16px rgba(0, 0, 0, 0.06);
-    --shadow-lg: 0 12px 24px rgba(0, 0, 0, 0.07);
+    /* 阴影效果 - 简洁 */
+    --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.05);
+    --shadow: 0 4px 8px rgba(0, 0, 0, 0.08);
+    --shadow-md: 0 6px 16px rgba(0, 0, 0, 0.1);
+    --shadow-lg: 0 12px 24px rgba(0, 0, 0, 0.12);
 
-    /* 渐变色 - 更加柔和 */
-    --gradient-primary: linear-gradient(135deg, hsl(220, 70%, 40%), hsl(220, 70%, 50%));
-    --gradient-accent: linear-gradient(135deg, hsl(220, 30%, 70%), hsl(220, 30%, 80%));
-    --gradient-cool: linear-gradient(135deg, hsl(220, 70%, 40%), hsl(200, 70%, 50%));
+    /* 渐变色 - 蓝色到深蓝色 */
+    --gradient-primary: linear-gradient(135deg, #126dff, #0046c0);
+    --gradient-accent: linear-gradient(135deg, #126dff, #4d8fff);
+    --gradient-cool: linear-gradient(135deg, #126dff, #00a3ff);
   }
 
   .dark {
-    /* 简洁优雅的暗色主题 */
-    --background: 240 10% 10%;
-    --foreground: 0 0% 95%;
+    /* 极简暗色主题 */
+    --background: 0 0% 10%; /* 近黑色 */
+    --foreground: 0 0% 100%; /* 纯白色 */
 
-    --card: 240 10% 12%;
-    --card-foreground: 0 0% 95%;
+    --card: 0 0% 12%; /* 深灰色 */
+    --card-foreground: 0 0% 100%; /* 纯白色 */
 
-    --popover: 240 10% 12%;
-    --popover-foreground: 0 0% 95%;
+    --popover: 0 0% 12%; /* 深灰色 */
+    --popover-foreground: 0 0% 100%; /* 纯白色 */
 
-    /* 主色调：柔和的蓝色 */
-    --primary: 220 70% 50%;
-    --primary-foreground: 0 0% 100%;
+    /* 主色调：#126dff 蓝色 */
+    --primary: 217 100% 54%;
+    --primary-foreground: 0 0% 100%; /* 纯白色 */
 
     /* 深灰色 */
-    --secondary: 240 10% 20%;
-    --secondary-foreground: 0 0% 95%;
+    --secondary: 0 0% 20%;
+    --secondary-foreground: 0 0% 100%; /* 纯白色 */
 
     /* 暗灰色 */
-    --muted: 240 10% 20%;
-    --muted-foreground: 240 10% 70%;
+    --muted: 0 0% 20%;
+    --muted-foreground: 0 0% 70%;
 
-    /* 强调色：柔和的蓝灰色 */
-    --accent: 220 30% 60%;
-    --accent-foreground: 0 0% 100%;
+    /* 强调色：同样使用主蓝色 */
+    --accent: 217 100% 54%;
+    --accent-foreground: 0 0% 100%; /* 纯白色 */
 
     /* 警告红 */
-    --destructive: 0 70% 60%;
-    --destructive-foreground: 0 0% 100%;
+    --destructive: 0 100% 60%;
+    --destructive-foreground: 0 0% 100%; /* 纯白色 */
 
     /* 边框和输入框 */
-    --border: 240 10% 20%;
-    --input: 240 10% 20%;
-    --ring: 220 70% 50%;
+    --border: 0 0% 20%;
+    --input: 0 0% 20%;
+    --ring: 217 100% 54%; /* #126dff */
   }
 }
 
@@ -141,12 +141,12 @@
   
   /* 渐变文本 */
   .gradient-text {
-    @apply bg-clip-text text-transparent bg-gradient-to-r from-[hsl(var(--primary))] to-[hsl(var(--accent))];
+    @apply bg-clip-text text-transparent bg-gradient-to-r from-[hsl(var(--primary))] to-[hsl(var(--primary))/70];
   }
   
   /* 渐变背景 */
   .gradient-bg {
-    @apply bg-gradient-to-r from-[hsl(var(--primary))] to-[hsl(var(--accent))];
+    @apply bg-gradient-to-r from-[hsl(var(--primary))] to-[hsl(var(--primary))/70];
   }
   
   /* 模糊背景 */
