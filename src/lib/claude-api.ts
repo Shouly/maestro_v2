@@ -243,13 +243,55 @@ export class ClaudeApiClient {
               // 执行 Bash 命令
               console.log('执行Bash命令:', JSON.stringify(toolInput, null, 2));
               try {
-                result = await core.invoke<ToolResult>('execute_bash_command', {
+                // 添加超时处理
+                const bashPromise = core.invoke<ToolResult>('execute_bash_command', {
                   args: { ...toolInput }
                 });
+                
+                // 设置超时
+                const timeoutPromise = new Promise<ToolResult>((_, reject) => {
+                  setTimeout(() => {
+                    reject(new Error('前端超时：Bash 命令执行时间过长'));
+                  }, 40000); // 40秒超时
+                });
+                
+                // 使用 Promise.race 实现超时
+                result = await Promise.race([bashPromise, timeoutPromise]);
+                
                 console.log('Bash命令执行结果:', JSON.stringify(result, null, 2));
+                
+                // 检查是否需要重启会话
+                if (result.system && result.system.includes('重启')) {
+                  console.log('Bash会话需要重启，自动重启中...');
+                  try {
+                    // 尝试重启会话
+                    await core.invoke<ToolResult>('execute_bash_command', {
+                      args: { restart: true }
+                    });
+                    console.log('Bash会话已重启');
+                  } catch (restartError) {
+                    console.error('重启Bash会话失败:', restartError);
+                  }
+                }
               } catch (error) {
                 console.error('Bash命令执行失败:', error);
-                throw error;
+                
+                // 创建错误结果
+                result = {
+                  error: `执行Bash命令失败: ${error}`,
+                  system: '请尝试使用 restart: true 重启 Bash 会话，或者使用更简单的命令'
+                };
+                
+                // 尝试重启会话
+                try {
+                  console.log('尝试自动重启Bash会话...');
+                  await core.invoke<ToolResult>('execute_bash_command', {
+                    args: { restart: true }
+                  });
+                  console.log('Bash会话已重启');
+                } catch (restartError) {
+                  console.error('重启Bash会话失败:', restartError);
+                }
               }
               break;
 

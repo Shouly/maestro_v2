@@ -152,20 +152,53 @@ pub struct BashCommandArgs {
 pub async fn execute_bash_command(args: BashCommandArgs) -> Result<ToolResult, String> {
     info!("接收到Bash命令: {:?}", args);
     
+    // 创建一个新的 BashTool 实例
     let bash_tool = BashTool::new();
     
-    match bash_tool.execute(
-        args.command,
-        args.restart.unwrap_or(false),
-    ).await {
+    // 添加超时处理
+    let execution_result = tokio::time::timeout(
+        std::time::Duration::from_secs(35), // 比工具内部超时稍长一些
+        bash_tool.execute(
+            args.command.clone(),
+            args.restart.unwrap_or(false),
+        )
+    ).await;
+    
+    // 处理超时和执行结果
+    match execution_result {
         Ok(result) => {
-            info!("Bash命令执行成功");
-            Ok(result)
+            match result {
+                Ok(tool_result) => {
+                    info!("Bash命令执行成功");
+                    Ok(tool_result)
+                },
+                Err(e) => {
+                    let err_msg = e.to_string();
+                    error!("Bash命令执行失败: {}", err_msg);
+                    
+                    // 如果是超时错误，返回更友好的错误信息
+                    if err_msg.contains("超时") {
+                        Ok(ToolResult {
+                            output: None,
+                            error: Some(format!("命令执行超时: {}", args.command.unwrap_or_default())),
+                            base64_image: None,
+                            system: Some("请尝试使用 restart: true 重启 Bash 会话，或者使用更简单的命令".to_string()),
+                        })
+                    } else {
+                        Err(err_msg)
+                    }
+                }
+            }
         },
-        Err(e) => {
-            let err_msg = e.to_string();
-            error!("Bash命令执行失败: {}", err_msg);
-            Err(err_msg)
+        Err(_) => {
+            // Tauri 命令本身超时
+            error!("Bash命令执行超时（Tauri 命令级别）");
+            Ok(ToolResult {
+                output: None,
+                error: Some("命令执行超时（Tauri 命令级别）".to_string()),
+                base64_image: None,
+                system: Some("请尝试使用 restart: true 重启 Bash 会话，或者使用更简单的命令".to_string()),
+            })
         }
     }
 }
