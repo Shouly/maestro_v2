@@ -91,6 +91,13 @@ export default function ChatPage() {
     theme: 'system',
   });
 
+  // 滚动到底部函数
+  const scrollToBottom = () => {
+    if (messagesEndRef.current) {
+      messagesEndRef.current.scrollIntoView({ behavior: 'smooth' });
+    }
+  };
+
   // 初始化
   useEffect(() => {
     // 从本地存储加载会话和设置
@@ -173,114 +180,140 @@ export default function ChatPage() {
 
   // 处理内容块
   const handleContentBlock = (block: ContentBlock) => {
+    // 更新UI以显示内容块
     if (block.type === 'text') {
-      // 文本块不需要特殊处理，会在最终响应中显示
+      // 文本块
+      const textBlock = block as TextBlock;
+      
+      // 查找或创建助手消息
+      const existingMessage = messages.find(m => m.role === 'assistant' && m.id === 'current-response');
+      
+      if (!existingMessage) {
+        // 创建新的助手消息
+        const assistantMessage: Message = {
+          id: 'current-response',
+          role: 'assistant',
+          content: textBlock.text,
+          timestamp: new Date(),
+        };
+        
+        // 添加到消息列表
+        setMessages(prev => [...prev, assistantMessage]);
+      } else {
+        // 更新现有助手消息
+        setMessages(prev => 
+          prev.map(m => 
+            m.id === 'current-response' 
+              ? { ...m, content: textBlock.text } 
+              : m
+          )
+        );
+      }
+    } else if (block.type === 'thinking') {
+      // 思考块 - 可以在UI中显示思考过程
+      // 这里可以添加思考过程的显示逻辑
     } else if (block.type === 'tool_use') {
-      // 工具使用块，添加到工具输出
+      // 工具使用块 - 显示工具调用
       const toolUseBlock = block as ToolUseBlock;
       
-      let title = '使用工具';
-      let content = JSON.stringify(toolUseBlock.input, null, 2);
-      let type: 'command' | 'screenshot' | 'code' | 'file' | 'info' = 'info';
-      
-      if (toolUseBlock.name === 'computer') {
-        title = '计算机操作';
-        type = 'screenshot';
-      } else if (toolUseBlock.name === 'bash') {
-        title = '执行命令';
-        type = 'command';
-        content = toolUseBlock.input.command;
-      } else if (toolUseBlock.name === 'edit') {
-        title = '文件操作';
-        type = 'file';
-        content = `${toolUseBlock.input.command} ${toolUseBlock.input.path}`;
-      }
-      
-      const toolOutput: Tool = {
+      // 添加工具调用到工具列表
+      const toolCall: Tool = {
         id: toolUseBlock.id,
-        type,
-        title,
-        content,
+        type: 'info',
+        title: `正在执行: ${toolUseBlock.name}`,
+        content: JSON.stringify(toolUseBlock.input, null, 2),
         timestamp: new Date(),
       };
       
-      setTools(prev => [...prev, toolOutput]);
+      setTools(prev => [...prev, toolCall]);
     }
+    
+    // 滚动到底部
+    scrollToBottom();
   };
 
   // 处理工具结果
   const handleToolResult = (result: ToolResult, toolUseId: string) => {
-    let type: 'success' | 'error' | 'code' | 'screenshot' = 'success';
-    let title = '工具结果';
-    let content = result.output || '';
+    // 查找对应的工具调用
+    const toolCall = tools.find(t => t.id === toolUseId);
     
-    if (result.error) {
-      type = 'error';
-      title = '错误';
-      content = result.error;
-    } else if (result.base64_image) {
-      type = 'screenshot';
-      title = '屏幕截图';
+    if (toolCall) {
+      // 创建工具结果
+      const toolResult: Tool = {
+        id: uuidv4(),
+        type: result.error ? 'error' : 'success',
+        title: `${toolCall.title.replace('正在执行', '执行结果')}`,
+        content: result.output || result.error || '操作成功完成',
+        imageData: result.base64_image,
+        timestamp: new Date(),
+      };
+      
+      // 更新工具列表
+      setTools(prev => [...prev, toolResult]);
+      
+      // 滚动到底部
+      scrollToBottom();
     }
-    
-    const toolOutput: Tool = {
-      id: uuidv4(),
-      type,
-      title,
-      content,
-      imageData: result.base64_image,
-      timestamp: new Date(),
-    };
-    
-    setTools(prev => [...prev, toolOutput]);
   };
 
   // 发送消息
   const handleSendMessage = async (content: string) => {
     if (!content.trim()) return;
-
-    // 添加用户消息
-    const userMessage: Message = {
-      id: uuidv4(),
-      role: 'user',
-      content,
-      timestamp: new Date(),
-    };
-
-    setMessages(prev => [...prev, userMessage]);
     
-    // 添加 Claude 用户消息
-    const userClaudeMessage: ClaudeMessage = {
-      role: 'user',
-      content: [{
-        type: 'text',
-        text: content
-      }]
-    };
-    
-    setClaudeMessages(prev => [...prev, userClaudeMessage]);
-    setIsLoading(true);
-
     try {
-      // 更新会话最后一条消息
+      // 设置加载状态
+      setIsLoading(true);
+      
+      // 创建用户消息
+      const userMessage: Message = {
+        id: uuidv4(),
+        role: 'user',
+        content: content,
+        timestamp: new Date(),
+      };
+      
+      // 添加到消息列表
+      setMessages(prev => [...prev, userMessage]);
+      
+      // 创建Claude消息格式
+      const userClaudeMessage: ClaudeMessage = {
+        role: 'user',
+        content: [{ type: 'text', text: content }],
+      };
+      
+      // 添加到Claude消息列表
+      const updatedClaudeMessages = [...claudeMessages, userClaudeMessage];
+      setClaudeMessages(updatedClaudeMessages);
+      
+      // 保存会话状态
       if (currentSessionId) {
-        setSessions(prev => 
-          prev.map(session => 
-            session.id === currentSessionId 
-              ? { ...session, lastMessage: content, timestamp: new Date() } 
-              : session
-          )
-        );
+        const currentSession = sessions.find(s => s.id === currentSessionId);
+        if (currentSession) {
+          const updatedSession = {
+            ...currentSession,
+            messages: [...messages, userMessage],
+            claudeMessages: updatedClaudeMessages,
+            tools: tools,
+            lastUpdated: new Date(),
+          };
+          
+          // 更新会话列表
+          setSessions(prev => prev.map(s => s.id === currentSessionId ? updatedSession : s));
+          
+          // 保存到本地存储
+          // TODO: 实现本地存储
+        }
       }
-
-      // 调用 Claude API
+      
+      // 调用Claude API
       const updatedMessages = await callClaudeAPI(
-        claudeMessages,
+        updatedClaudeMessages,
         {
           apiKey: settings.apiKey,
-          apiProvider: 'anthropic',
+          apiProvider: settings.apiProvider as 'anthropic',
           modelVersion: settings.modelVersion,
-          maxOutputTokens: settings.maxOutputTokens,
+          model: settings.modelVersion,
+          maxTokens: settings.maxOutputTokens,
           systemPrompt: settings.customSystemPrompt,
           onlyNMostRecentImages: settings.onlyNMostRecentImages,
           thinkingEnabled: settings.thinkingEnabled,
@@ -289,47 +322,68 @@ export default function ChatPage() {
           enableComputerTool: settings.enableComputerTool,
           enableBashTool: settings.enableBashTool,
           enableEditTool: settings.enableEditTool,
+          toolVersion: settings.toolVersion,
         },
         handleContentBlock,
         handleToolResult
       );
       
+      // 更新Claude消息列表
       setClaudeMessages(updatedMessages);
       
-      // 提取最后一条 AI 消息
-      const lastMessage = updatedMessages[updatedMessages.length - 1];
-      if (lastMessage.role === 'assistant') {
-        // 提取文本内容
-        const textContent = lastMessage.content
-          .filter(block => block.type === 'text')
-          .map(block => (block as TextBlock).text)
-          .join('\n\n');
-        
-        // 添加 AI 响应
-        const assistantMessage: Message = {
-          id: uuidv4(),
-          role: 'assistant',
-          content: textContent,
-          timestamp: new Date(),
-        };
-        
-        setMessages(prev => [...prev, assistantMessage]);
+      // 完成对话后，将临时消息ID替换为永久ID
+      setMessages(prev => 
+        prev.map(m => 
+          m.id === 'current-response' 
+            ? { ...m, id: uuidv4() } 
+            : m
+        ) as Message[]
+      );
+      
+      // 保存更新后的会话状态
+      if (currentSessionId) {
+        const currentSession = sessions.find(s => s.id === currentSessionId);
+        if (currentSession) {
+          const finalMessages = messages.map(m => 
+            m.id === 'current-response' 
+              ? { ...m, id: uuidv4() } 
+              : m
+          ) as Message[];
+          
+          const updatedSession = {
+            ...currentSession,
+            messages: finalMessages,
+            claudeMessages: updatedMessages,
+            tools: tools,
+            lastUpdated: new Date(),
+          };
+          
+          // 更新会话列表
+          setSessions(prev => prev.map(s => s.id === currentSessionId ? updatedSession : s));
+          
+          // 保存到本地存储
+          // TODO: 实现本地存储
+        }
       }
-      
-      setIsLoading(false);
     } catch (error) {
-      console.error('Error processing message:', error);
+      console.error('发送消息时出错:', error);
       
-      // 添加错误消息
-      const errorMessage: Message = {
+      // 显示错误消息
+      const errorTool: Tool = {
         id: uuidv4(),
-        role: 'assistant',
-        content: `处理消息时出错: ${error}`,
+        type: 'error',
+        title: '发送消息时出错',
+        content: `${error}`,
         timestamp: new Date(),
       };
       
-      setMessages(prev => [...prev, errorMessage]);
+      setTools(prev => [...prev, errorTool]);
+    } finally {
+      // 清除加载状态
       setIsLoading(false);
+      
+      // 滚动到底部
+      scrollToBottom();
     }
   };
 

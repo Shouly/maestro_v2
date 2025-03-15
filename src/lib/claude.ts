@@ -1,6 +1,35 @@
 import { core } from '@tauri-apps/api';
 import { ClaudeApiClient } from './claude-api';
 
+// 工具版本类型
+export type ToolVersion = 'computer_use_20250124' | 'computer_use_20241022';
+export type BetaFlag = 'computer-use-2024-10-22' | 'computer-use-2025-01-24';
+
+// 工具组定义
+export interface ToolGroup {
+  version: ToolVersion;
+  tools: string[];
+  betaFlag: BetaFlag | null;
+}
+
+// 工具组映射
+export const TOOL_GROUPS: ToolGroup[] = [
+  {
+    version: 'computer_use_20241022',
+    tools: ['computer', 'bash', 'edit'],
+    betaFlag: 'computer-use-2024-10-22',
+  },
+  {
+    version: 'computer_use_20250124',
+    tools: ['computer', 'bash', 'edit'],
+    betaFlag: 'computer-use-2025-01-24',
+  },
+];
+
+// 按版本映射工具组
+export const TOOL_GROUPS_BY_VERSION: Record<ToolVersion, ToolGroup> = 
+  TOOL_GROUPS.reduce((acc, group) => ({...acc, [group.version]: group}), {} as Record<ToolVersion, ToolGroup>);
+
 // 消息类型
 export interface Message {
   role: 'user' | 'assistant';
@@ -57,20 +86,23 @@ export interface ToolResult {
   system?: string;
 }
 
-// Claude API 配置
+// Claude配置接口
 export interface ClaudeConfig {
   apiKey: string;
-  apiProvider: 'anthropic';
+  apiProvider: 'anthropic' | 'mock';
+  model: string;
   modelVersion: string;
-  maxOutputTokens: number;
+  maxTokens: number;
   systemPrompt: string;
+  enableComputerTool: boolean;
+  enableBashTool: boolean;
+  enableEditTool: boolean;
+  thinkingEnabled: boolean;
+  thinkingBudget: number;
   onlyNMostRecentImages?: number;
-  thinkingEnabled?: boolean;
-  thinkingBudget?: number;
-  tokenEfficientToolsBeta?: boolean;
-  enableComputerTool?: boolean;
-  enableBashTool?: boolean;
-  enableEditTool?: boolean;
+  tokenEfficientToolsBeta: boolean;
+  toolVersion: ToolVersion;
+  promptCaching?: boolean;
 }
 
 // 工具定义
@@ -136,472 +168,100 @@ export const AVAILABLE_TOOLS: Tool[] = [
   },
 ];
 
-// 系统提示
-const DEFAULT_SYSTEM_PROMPT = `你是一个强大的 AI 助手，可以控制计算机执行各种任务。
-你可以使用以下工具：
-1. computer - 控制计算机执行各种操作，如截图、点击等
-2. bash - 执行 Bash 命令
-3. edit - 编辑文件
+// 计算机工具
+export const COMPUTER_TOOL = AVAILABLE_TOOLS.find(t => t.name === 'computer')!;
+// Bash工具
+export const BASH_TOOL = AVAILABLE_TOOLS.find(t => t.name === 'bash')!;
+// 编辑工具
+export const EDIT_TOOL = AVAILABLE_TOOLS.find(t => t.name === 'edit')!;
 
-当用户请求你执行任务时，请使用适当的工具来完成任务。`;
+// 获取系统架构
+function getSystemArchitecture(): string {
+  // 在实际环境中，这应该从系统获取
+  // 这里简单返回一个值
+  return navigator.platform || 'x86_64';
+}
+
+// 系统提示
+const DEFAULT_SYSTEM_PROMPT = `<SYSTEM_CAPABILITY>
+* You are utilising an ${navigator.platform.includes('Mac') ? 'macOS' : navigator.platform.includes('Win') ? 'Windows' : 'Linux'} system using ${getSystemArchitecture()} architecture with internet access.
+* You can feel free to install applications with your bash tool. Use curl instead of wget.
+* To open a browser, please just click on the browser icon or use the bash tool to launch it.
+* Using bash tool you can start GUI applications, but they may take some time to appear. Take a screenshot to confirm it did.
+* When using your bash tool with commands that are expected to output very large quantities of text, redirect into a tmp file and use str_replace_editor or \`grep -n -B <lines before> -A <lines after> <query> <filename>\` to confirm output.
+* When viewing a page it can be helpful to zoom out so that you can see everything on the page. Either that, or make sure you scroll down to see everything before deciding something isn't available.
+* When using your computer function calls, they take a while to run and send back to you. Where possible/feasible, try to chain multiple of these calls all into one function calls request.
+* The current date is ${new Date().toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}.
+</SYSTEM_CAPABILITY>
+
+<IMPORTANT>
+* When using a browser, if a startup wizard appears, IGNORE IT. Do not even click "skip this step". Instead, click on the address bar where it says "Search or enter address", and enter the appropriate search term or URL there.
+* If the item you are looking at is a pdf, if after taking a single screenshot of the pdf it seems that you want to read the entire document instead of trying to continue to read the pdf from your screenshots + navigation, determine the URL, use curl to download the pdf, install and use pdftotext to convert it to a text file, and then read that text file directly with your edit tool.
+</IMPORTANT>`;
 
 // 调用 Claude API
 export async function callClaudeAPI(
   messages: Message[],
   config: ClaudeConfig,
-  onContentBlock: (block: ContentBlock) => void,
-  onToolResult: (result: ToolResult, toolUseId: string) => void
+  onContentBlock?: (block: ContentBlock) => void,
+  onToolResult?: (result: ToolResult, toolUseId: string) => void
 ): Promise<Message[]> {
-  try {
-    // 如果有 API 密钥，使用实际的 Claude API
-    if (config.apiKey && config.apiProvider === 'anthropic') {
-      const client = new ClaudeApiClient(config.apiKey);
-      
-      // 准备工具
-      const tools: Tool[] = [];
-      
-      if (config.enableComputerTool) {
-        tools.push(AVAILABLE_TOOLS.find(t => t.name === 'computer')!);
-      }
-      
-      if (config.enableBashTool) {
-        tools.push(AVAILABLE_TOOLS.find(t => t.name === 'bash')!);
-      }
-      
-      if (config.enableEditTool) {
-        tools.push(AVAILABLE_TOOLS.find(t => t.name === 'edit')!);
-      }
-      
-      try {
-        // 发送消息到 API 并处理工具调用
-        return await client.handleToolCalls(
-          messages,
-          config.modelVersion,
-          config.maxOutputTokens,
-          config.systemPrompt || DEFAULT_SYSTEM_PROMPT,
-          tools,
-          onContentBlock,
-          onToolResult
-        );
-      } catch (error) {
-        console.error('Error calling Claude API:', error);
-        throw error;
-      }
-    }
-    
-    // 如果没有 API 密钥或使用模拟模式，使用模拟响应
-    return await simulateClaudeResponse(
-      messages,
-      config,
-      onContentBlock,
-      onToolResult
-    );
-  } catch (error) {
-    console.error('调用 Claude API 失败:', error);
-    throw error;
-  }
-}
-
-// 模拟 Claude 响应
-async function simulateClaudeResponse(
-  messages: Message[],
-  config: ClaudeConfig,
-  onContentBlock: (block: ContentBlock) => void,
-  onToolResult: (result: ToolResult, toolUseId: string) => void
-): Promise<Message[]> {
-  // 获取最后一条消息
-  const lastMessage = messages[messages.length - 1];
-  if (lastMessage.role !== 'user') {
-    throw new Error('最后一条消息必须是用户消息');
+  // 获取工具组
+  const toolGroup = TOOL_GROUPS_BY_VERSION[config.toolVersion];
+  
+  // 准备工具
+  const tools: Tool[] = [];
+  
+  // 添加计算机工具
+  if (config.enableComputerTool && toolGroup.tools.includes('computer')) {
+    tools.push(COMPUTER_TOOL);
   }
   
-  // 模拟 AI 响应
-  const responseContent: ContentBlock[] = [];
-  
-  // 解析用户消息中的关键词，决定使用哪个工具
-  const userText = lastMessage.content
-    .filter(block => block.type === 'text')
-    .map(block => (block as TextBlock).text)
-    .join(' ');
-  
-  if (userText.toLowerCase().includes('截图') || userText.toLowerCase().includes('屏幕')) {
-    // 使用 computer 工具进行截图
-    const toolUseId = generateId();
-    const toolUseBlock: ToolUseBlock = {
-      type: 'tool_use',
-      id: toolUseId,
-      name: 'computer',
-      input: { action: 'screenshot' },
-    };
-    
-    responseContent.push(toolUseBlock);
-    onContentBlock(toolUseBlock);
-    
-    // 调用 Tauri 命令执行截图
-    try {
-      const result = await core.invoke<ToolResult>('take_screenshot');
-      
-      // 创建工具结果块
-      const toolResultContent: (TextBlock | ImageBlock)[] = [];
-      
-      if (result.output) {
-        toolResultContent.push({
-          type: 'text',
-          text: result.output,
-        });
-      }
-      
-      if (result.base64_image) {
-        toolResultContent.push({
-          type: 'image',
-          source: {
-            type: 'base64',
-            media_type: 'image/png',
-            data: result.base64_image,
-          },
-        });
-      }
-      
-      const toolResultBlock: ToolResultBlock = {
-        type: 'tool_result',
-        tool_use_id: toolUseId,
-        content: toolResultContent,
-        is_error: !!result.error,
-      };
-      
-      onToolResult(result, toolUseId);
-      
-      // 添加文本响应
-      responseContent.push({
-        type: 'text',
-        text: '我已经截取了屏幕截图，您可以在上面看到结果。',
-      });
-      
-      // 创建 AI 响应消息
-      const responseMessage: Message = {
-        role: 'assistant',
-        content: responseContent,
-      };
-      
-      // 创建工具结果消息
-      const toolResultMessage: Message = {
-        role: 'user',
-        content: [toolResultBlock],
-      };
-      
-      // 创建最终 AI 响应
-      const finalResponseMessage: Message = {
-        role: 'assistant',
-        content: [{
-          type: 'text',
-          text: '我已经截取了屏幕截图，您可以在上面看到结果。请问还需要我做什么？',
-        }],
-      };
-      
-      // 返回更新后的消息列表
-      return [...messages, responseMessage, toolResultMessage, finalResponseMessage];
-    } catch (error) {
-      const errorResult: ToolResult = {
-        error: `截图失败: ${error}`,
-      };
-      
-      onToolResult(errorResult, toolUseId);
-      
-      // 添加错误响应
-      responseContent.push({
-        type: 'text',
-        text: `截图时出现错误: ${error}`,
-      });
-      
-      // 创建 AI 响应消息
-      const responseMessage: Message = {
-        role: 'assistant',
-        content: responseContent,
-      };
-      
-      // 创建工具结果消息
-      const toolResultMessage: Message = {
-        role: 'user',
-        content: [{
-          type: 'tool_result',
-          tool_use_id: toolUseId,
-          content: `截图失败: ${error}`,
-          is_error: true,
-        }],
-      };
-      
-      // 创建最终 AI 响应
-      const finalResponseMessage: Message = {
-        role: 'assistant',
-        content: [{
-          type: 'text',
-          text: `截图时出现错误: ${error}。请问我可以帮您做些什么其他事情吗？`,
-        }],
-      };
-      
-      // 返回更新后的消息列表
-      return [...messages, responseMessage, toolResultMessage, finalResponseMessage];
-    }
-  } else if (userText.toLowerCase().includes('bash') || userText.toLowerCase().includes('命令') || userText.toLowerCase().includes('执行')) {
-    // 提取命令
-    const commandMatch = userText.match(/执行[：:]\s*(.+)/) || userText.match(/运行[：:]\s*(.+)/);
-    const command = commandMatch ? commandMatch[1].trim() : 'echo "Hello from Bash"';
-    
-    // 使用 bash 工具执行命令
-    const toolUseId = generateId();
-    const toolUseBlock: ToolUseBlock = {
-      type: 'tool_use',
-      id: toolUseId,
-      name: 'bash',
-      input: { command, restart: false },
-    };
-    
-    responseContent.push(toolUseBlock);
-    onContentBlock(toolUseBlock);
-    
-    // 调用 Tauri 命令执行 Bash 命令
-    try {
-      const result = await core.invoke<ToolResult>('execute_bash_command', {
-        args: { command, restart: false }
-      });
-      
-      // 创建工具结果块
-      const toolResultContent: (TextBlock | ImageBlock)[] = [];
-      
-      if (result.output) {
-        toolResultContent.push({
-          type: 'text',
-          text: result.output,
-        });
-      }
-      
-      const toolResultBlock: ToolResultBlock = {
-        type: 'tool_result',
-        tool_use_id: toolUseId,
-        content: toolResultContent,
-        is_error: !!result.error,
-      };
-      
-      onToolResult(result, toolUseId);
-      
-      // 添加文本响应
-      responseContent.push({
-        type: 'text',
-        text: `我已经执行了命令 \`${command}\`，您可以在上面看到结果。`,
-      });
-      
-      // 创建 AI 响应消息
-      const responseMessage: Message = {
-        role: 'assistant',
-        content: responseContent,
-      };
-      
-      // 创建工具结果消息
-      const toolResultMessage: Message = {
-        role: 'user',
-        content: [toolResultBlock],
-      };
-      
-      // 创建最终 AI 响应
-      const finalResponseMessage: Message = {
-        role: 'assistant',
-        content: [{
-          type: 'text',
-          text: `我已经执行了命令 \`${command}\`，您可以在上面看到结果。请问还需要我做什么？`,
-        }],
-      };
-      
-      // 返回更新后的消息列表
-      return [...messages, responseMessage, toolResultMessage, finalResponseMessage];
-    } catch (error) {
-      const errorResult: ToolResult = {
-        error: `命令执行失败: ${error}`,
-      };
-      
-      onToolResult(errorResult, toolUseId);
-      
-      // 添加错误响应
-      responseContent.push({
-        type: 'text',
-        text: `执行命令时出现错误: ${error}`,
-      });
-      
-      // 创建 AI 响应消息
-      const responseMessage: Message = {
-        role: 'assistant',
-        content: responseContent,
-      };
-      
-      // 创建工具结果消息
-      const toolResultMessage: Message = {
-        role: 'user',
-        content: [{
-          type: 'tool_result',
-          tool_use_id: toolUseId,
-          content: `命令执行失败: ${error}`,
-          is_error: true,
-        }],
-      };
-      
-      // 创建最终 AI 响应
-      const finalResponseMessage: Message = {
-        role: 'assistant',
-        content: [{
-          type: 'text',
-          text: `执行命令时出现错误: ${error}。请问我可以帮您做些什么其他事情吗？`,
-        }],
-      };
-      
-      // 返回更新后的消息列表
-      return [...messages, responseMessage, toolResultMessage, finalResponseMessage];
-    }
-  } else if (userText.toLowerCase().includes('文件') || userText.toLowerCase().includes('编辑')) {
-    // 提取路径
-    const pathMatch = userText.match(/文件[：:]\s*(.+)/) || userText.match(/路径[：:]\s*(.+)/);
-    const path = pathMatch ? pathMatch[1].trim() : '/tmp/example.txt';
-    
-    // 使用 edit 工具查看文件
-    const toolUseId = generateId();
-    const toolUseBlock: ToolUseBlock = {
-      type: 'tool_use',
-      id: toolUseId,
-      name: 'edit',
-      input: { command: 'view', path },
-    };
-    
-    responseContent.push(toolUseBlock);
-    onContentBlock(toolUseBlock);
-    
-    // 调用 Tauri 命令执行文件编辑
-    try {
-      const result = await core.invoke<ToolResult>('execute_edit_command', {
-        args: { 
-          command: 'view',
-          path,
-        }
-      });
-      
-      // 创建工具结果块
-      const toolResultContent: (TextBlock | ImageBlock)[] = [];
-      
-      if (result.output) {
-        toolResultContent.push({
-          type: 'text',
-          text: result.output,
-        });
-      }
-      
-      const toolResultBlock: ToolResultBlock = {
-        type: 'tool_result',
-        tool_use_id: toolUseId,
-        content: toolResultContent,
-        is_error: !!result.error,
-      };
-      
-      onToolResult(result, toolUseId);
-      
-      // 添加文本响应
-      responseContent.push({
-        type: 'text',
-        text: `我已经查看了文件 \`${path}\`，您可以在上面看到内容。`,
-      });
-      
-      // 创建 AI 响应消息
-      const responseMessage: Message = {
-        role: 'assistant',
-        content: responseContent,
-      };
-      
-      // 创建工具结果消息
-      const toolResultMessage: Message = {
-        role: 'user',
-        content: [toolResultBlock],
-      };
-      
-      // 创建最终 AI 响应
-      const finalResponseMessage: Message = {
-        role: 'assistant',
-        content: [{
-          type: 'text',
-          text: `我已经查看了文件 \`${path}\`，您可以在上面看到内容。请问还需要我做什么？`,
-        }],
-      };
-      
-      // 返回更新后的消息列表
-      return [...messages, responseMessage, toolResultMessage, finalResponseMessage];
-    } catch (error) {
-      const errorResult: ToolResult = {
-        error: `文件操作失败: ${error}`,
-      };
-      
-      onToolResult(errorResult, toolUseId);
-      
-      // 添加错误响应
-      responseContent.push({
-        type: 'text',
-        text: `查看文件时出现错误: ${error}`,
-      });
-      
-      // 创建 AI 响应消息
-      const responseMessage: Message = {
-        role: 'assistant',
-        content: responseContent,
-      };
-      
-      // 创建工具结果消息
-      const toolResultMessage: Message = {
-        role: 'user',
-        content: [{
-          type: 'tool_result',
-          tool_use_id: toolUseId,
-          content: `文件操作失败: ${error}`,
-          is_error: true,
-        }],
-      };
-      
-      // 创建最终 AI 响应
-      const finalResponseMessage: Message = {
-        role: 'assistant',
-        content: [{
-          type: 'text',
-          text: `查看文件时出现错误: ${error}。请问我可以帮您做些什么其他事情吗？`,
-        }],
-      };
-      
-      // 返回更新后的消息列表
-      return [...messages, responseMessage, toolResultMessage, finalResponseMessage];
-    }
-  } else {
-    // 如果没有匹配到任何工具，返回一般性回复
-    responseContent.push({
-      type: 'text',
-      text: `我收到了您的消息："${userText}"。我可以帮助您控制计算机、执行命令和编辑文件。请告诉我您需要什么帮助？`,
-    });
-    
-    // 创建 AI 响应消息
-    const responseMessage: Message = {
-      role: 'assistant',
-      content: responseContent,
-    };
-    
-    // 返回更新后的消息列表
-    return [...messages, responseMessage];
+  // 添加Bash工具
+  if (config.enableBashTool && toolGroup.tools.includes('bash')) {
+    tools.push(BASH_TOOL);
   }
+  
+  // 添加编辑工具
+  if (config.enableEditTool && toolGroup.tools.includes('edit')) {
+    tools.push(EDIT_TOOL);
+  }
+  
+  // 创建API客户端
+  const client = new ClaudeApiClient(config.apiKey);
+  
+  // 准备选项
+  const options = {
+    thinkingEnabled: config.thinkingEnabled,
+    thinkingBudget: config.thinkingBudget,
+    onlyNMostRecentImages: config.onlyNMostRecentImages,
+    tokenEfficientToolsBeta: config.tokenEfficientToolsBeta,
+    promptCaching: config.promptCaching || false,
+    betas: [] as string[]
+  };
+  
+  // 添加beta标志
+  if (toolGroup.betaFlag) {
+    options.betas.push(toolGroup.betaFlag);
+  }
+  
+  if (config.tokenEfficientToolsBeta) {
+    options.betas.push('token-efficient-tools-2025-02-19');
+  }
+  
+  if (config.promptCaching) {
+    options.betas.push('prompt-caching-2024-07-31');
+  }
+  
+  // 调用API
+  return client.handleToolCalls(
+    messages,
+    config.model,
+    config.maxTokens,
+    config.systemPrompt || DEFAULT_SYSTEM_PROMPT,
+    tools,
+    onContentBlock,
+    onToolResult,
+    options
+  );
 }
-
-// 生成唯一 ID
-function generateId(): string {
-  return Math.random().toString(36).substring(2, 15);
-}
-
-// 将消息转换为 API 格式
-export function convertMessagesToApiFormat(messages: Message[]): any {
-  // 在实际实现中，这里会将消息转换为 Claude API 所需的格式
-  return messages;
-}
-
-// 将 API 响应转换为消息格式
-export function convertApiResponseToMessage(response: any): Message {
-  // 在实际实现中，这里会将 API 响应转换为消息格式
-  return response;
-} 
