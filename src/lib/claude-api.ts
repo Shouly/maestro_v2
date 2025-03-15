@@ -40,24 +40,27 @@ export class ClaudeApiClient {
     // 准备工具
     const anthropicTools = tools.length > 0 ? tools.map(tool => {
       // 基本工具定义
-      const toolDef: Record<string, any> = {
-        name: tool.name,
-        description: tool.description,
-        input_schema: tool.input_schema,
-      };
-
-      // 如果是计算机工具且有选项，直接将选项合并到工具定义中
-      if (tool.name === 'computer' && tool.options) {
-        // 直接将选项合并到工具定义中，与Python版本保持一致
+      if (tool.name === 'computer') {
+        // 对于计算机工具，使用Anthropic定义的工具格式
+        const toolVersion = tool.input_schema.properties.action.enum.includes('wait') 
+          ? 'computer_20250124' 
+          : 'computer_20241022';
+        
+        // 与Python版本保持一致，将选项展开为顶级属性
         return {
-          ...toolDef,
-          display_width_px: tool.options.display_width_px,
-          display_height_px: tool.options.display_height_px,
-          display_number: tool.options.display_number,
+          name: tool.name,
+          type: toolVersion,
+          // 展开选项作为顶级属性
+          ...(tool.options || {})
+        };
+      } else {
+        // 其他自定义工具
+        return {
+          name: tool.name,
+          description: tool.description,
+          input_schema: tool.input_schema,
         };
       }
-
-      return toolDef;
     }) : undefined;
 
     // 准备额外参数
