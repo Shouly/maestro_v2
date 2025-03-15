@@ -122,7 +122,7 @@ export default function ChatPage() {
           {
             id: '1',
             title: '新会话',
-            lastMessage: '欢迎使用 Maestro',
+            lastMessage: '新建会话',
             timestamp: new Date(),
             isActive: true,
           }
@@ -131,26 +131,9 @@ export default function ChatPage() {
         setSessions(demoSessions);
         setCurrentSessionId('1');
     
-        // 添加欢迎消息
-        const welcomeMessage: Message = {
-          id: uuidv4(),
-          role: 'assistant',
-          content: '你好！我是 Maestro，你的 AI 助手。我可以帮助你控制计算机、执行命令和编辑文件。请告诉我你需要什么帮助？',
-          timestamp: new Date(),
-        };
-        
-        setMessages([welcomeMessage]);
-        
-        // 初始化 Claude 消息
-        const welcomeClaudeMessage: ClaudeMessage = {
-          role: 'assistant',
-          content: [{
-            type: 'text',
-            text: '你好！我是 Maestro，你的 AI 助手。我可以帮助你控制计算机、执行命令和编辑文件。请告诉我你需要什么帮助？'
-          }]
-        };
-        
-        setClaudeMessages([welcomeClaudeMessage]);
+        // 不再添加欢迎消息和初始化Claude消息
+        setMessages([]);
+        setClaudeMessages([]);
 
         // 获取计算机工具配置
         try {
@@ -507,26 +490,9 @@ export default function ChatPage() {
     
     setCurrentSessionId(sessionId);
     
-    // 模拟加载会话数据
-    setMessages([
-      {
-        id: uuidv4(),
-        role: 'assistant',
-        content: '已加载会话。我可以继续帮助你吗？',
-        timestamp: new Date(),
-      }
-    ]);
-    
-    setClaudeMessages([
-      {
-        role: 'assistant',
-        content: [{
-          type: 'text',
-          text: '已加载会话。我可以继续帮助你吗？'
-        }]
-      }
-    ]);
-    
+    // 不再显示欢迎消息，而是清空消息列表
+    setMessages([]);
+    setClaudeMessages([]);
     setTools([]);
   };
 
