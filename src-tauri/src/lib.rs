@@ -10,17 +10,14 @@ pub enum Error {
 
 pub type Result<T> = std::result::Result<T, Error>;
 
-#[tauri::command]
-pub fn greet(name: &str) -> String {
-    format!("你好，{}！欢迎使用 Maestro！", name)
-}
+// 注意：greet命令已移至commands.rs模块
 
 /// 构建Tauri应用程序
 /// 
 /// 这个函数封装了Tauri应用的核心构建逻辑，可以被不同平台的入口点调用
 pub fn build_app() -> tauri::Builder<tauri::Wry> {
     tauri::Builder::default()
-        .invoke_handler(tauri::generate_handler![greet])
+        // 注意：命令处理器在main.rs中注册
         .setup(|app| {
             #[cfg(debug_assertions)]
             {
