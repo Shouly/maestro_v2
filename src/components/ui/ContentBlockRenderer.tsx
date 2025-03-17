@@ -59,12 +59,19 @@ export const ContentBlockRenderer: React.FC<ContentBlockRendererProps> = ({
     
     case 'tool_use':
       const toolUseBlock = block as ToolUseBlock;
+      console.log('渲染工具使用块:', toolUseBlock);
       return (
-        <div className={cn("tool-use my-2", className)}>
-          <div className="font-medium mb-1">🔧 正在执行: {toolUseBlock.name}</div>
-          <pre className="p-2 bg-[hsl(var(--muted))] rounded-md text-xs overflow-auto">
-            {JSON.stringify(toolUseBlock.input, null, 2)}
-          </pre>
+        <div className={cn("tool-use my-2 p-4 bg-[hsl(var(--muted))/30] rounded-lg border border-[hsl(var(--border))]", className)}>
+          <div className="font-medium mb-2 text-base flex items-center">
+            <span className="mr-2">🔧</span>
+            <span>Tool Use: {toolUseBlock.name}</span>
+          </div>
+          <div className="mt-2">
+            <div className="font-medium text-sm mb-1">Input:</div>
+            <pre className="p-2 bg-[hsl(var(--muted))] rounded-md text-xs overflow-auto">
+              {JSON.stringify(toolUseBlock.input, null, 2)}
+            </pre>
+          </div>
         </div>
       );
     

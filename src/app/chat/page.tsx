@@ -28,32 +28,6 @@ import {
 const { invoke } = core;
 const { listen } = event;
 
-// 临时定义useSettings hook，实际项目中应该从providers中导入
-const useSettings = () => {
-  // 返回默认设置
-  return {
-    settings: {
-      apiKey: '',
-      apiProvider: 'anthropic',
-      modelVersion: 'claude-3-opus-20240229',
-      maxOutputTokens: 4000,
-      customSystemPrompt: '',
-      onlyNMostRecentImages: 10,
-      thinkingEnabled: true,
-      thinkingBudget: 1000,
-      tokenEfficientToolsBeta: true,
-      enableComputerTool: true,
-      enableBashTool: true,
-      enableEditTool: true,
-      toolVersion: 'computer_use_20250124',
-      computerToolOptions: {
-        display_width_px: 1280,
-        display_height_px: 720
-      }
-    }
-  };
-};
-
 // 消息类型
 interface Message {
   id: string;
@@ -226,6 +200,8 @@ export default function ChatPage() {
 
   // 处理内容块
   const handleContentBlock = (block: ContentBlock) => {
+    console.log('处理内容块:', block);
+    
     // 更新UI以显示内容块
     if (block.type === 'text') {
       // 文本块
@@ -296,6 +272,7 @@ export default function ChatPage() {
     } else if (block.type === 'tool_use') {
       // 工具使用块 - 显示工具调用
       const toolUseBlock = block as ToolUseBlock;
+      console.log('执行计算机操作:', JSON.stringify(toolUseBlock.input, null, 2));
 
       // 添加工具调用到工具列表
       const toolCall: Tool = {
@@ -310,22 +287,55 @@ export default function ChatPage() {
 
       // 将工具调用信息追加到当前消息内容中
       if (currentResponseId) {
-        setMessages(prev =>
-          prev.map(m =>
-            m.id === currentResponseId
-              ? {
-                ...m,
-                blocks: [...m.blocks, toolUseBlock],
-                toolIds: [...(m.toolIds || []), toolUseBlock.id]
-              }
-              : m
-          )
-        );
+        // 更新现有助手消息，添加工具使用块
+        setMessages(prev => {
+          // 找到当前响应消息
+          const currentMessage = prev.find(m => m.id === currentResponseId);
+          
+          if (currentMessage) {
+            // 检查是否已经有相同ID的工具使用块
+            const hasToolUse = currentMessage.blocks.some(b => 
+              b.type === 'tool_use' && (b as ToolUseBlock).id === toolUseBlock.id
+            );
+            
+            if (!hasToolUse) {
+              // 如果没有相同ID的工具使用块，添加新的工具使用块
+              return prev.map(m =>
+                m.id === currentResponseId
+                  ? {
+                    ...m,
+                    blocks: [...m.blocks, toolUseBlock],
+                    toolIds: [...(m.toolIds || []), toolUseBlock.id]
+                  }
+                  : m
+              );
+            }
+          }
+          
+          return prev;
+        });
+      } else {
+        // 如果没有当前响应ID，创建一个新的助手消息
+        const responseId = `response-${uuidv4()}`;
+        setCurrentResponseId(responseId);
+
+        const assistantMessage: Message = {
+          id: responseId,
+          role: 'assistant',
+          blocks: [toolUseBlock],
+          timestamp: new Date(),
+          toolIds: [toolUseBlock.id],
+        };
+
+        // 添加到消息列表
+        setMessages(prev => [...prev, assistantMessage]);
       }
     }
 
     // 滚动到底部
-    scrollToBottom();
+    setTimeout(() => {
+      scrollToBottom();
+    }, 100);
   };
 
   // 处理工具结果
@@ -391,7 +401,7 @@ export default function ChatPage() {
       // 添加工具结果消息到消息列表
       setMessages(prev => {
         const newMessages = [...prev, toolResultMessage];
-        console.log('更新后的消息列表:', newMessages);
+        console.log('更新后的消息列表(添加工具结果):', newMessages);
         return newMessages;
       });
 
