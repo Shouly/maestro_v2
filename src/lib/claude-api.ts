@@ -14,6 +14,9 @@ export class ClaudeApiClient {
     this.client = new Anthropic({
       apiKey: apiKey,
       dangerouslyAllowBrowser: true,
+      defaultHeaders: {
+        'anthropic-beta': 'computer-use-2025-01-24,token-efficient-tools-2025-02-19,prompt-caching-2024-07-31'
+      }
     });
   }
 

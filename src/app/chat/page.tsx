@@ -76,7 +76,7 @@ export default function ChatPage() {
     enableEditTool: true,
 
     // 输出配置
-    maxOutputTokens: 128000,
+    maxOutputTokens: 16384,
     defaultOutputTokens: 16384,
     thinkingEnabled: true,
     thinkingBudget: 8192,
