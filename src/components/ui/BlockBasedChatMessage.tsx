@@ -28,6 +28,30 @@ export const BlockBasedChatMessage: React.FC<BlockBasedChatMessageProps> = ({
     minute: '2-digit',
   }).format(timestamp) : '';
 
+  // 检查是否只包含工具结果块
+  const isToolResultOnly = blocks.length === 1 && blocks[0].type === 'tool_result';
+
+  // 如果是只包含工具结果的用户消息，使用特殊样式
+  if (isUser && isToolResultOnly) {
+    return (
+      <div className={cn(
+        "w-full mb-4 animate-in fade-in slide-in-from-bottom-4 duration-300",
+        className
+      )}>
+        <div className="flex justify-center">
+          <div className="max-w-[90%] md:max-w-[80%]">
+            <ContentBlockRenderer block={blocks[0]} />
+            {timestamp && (
+              <div className="text-xs text-center text-[hsl(var(--muted-foreground))] mt-1">
+                {formattedTime}
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className={cn(
       "w-full mb-4 animate-in fade-in slide-in-from-bottom-4 duration-300",
@@ -72,8 +96,8 @@ export const BlockBasedChatMessage: React.FC<BlockBasedChatMessageProps> = ({
               ) : (
                 <div>
                   {isUser ? (
-                    // 用户消息只显示文本块
-                    blocks.filter(block => block.type === 'text').map((block, index) => (
+                    // 用户消息只显示文本块，但要确保工具使用块也能显示
+                    blocks.map((block, index) => (
                       <ContentBlockRenderer key={index} block={block} />
                     ))
                   ) : (

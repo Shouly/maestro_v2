@@ -1,5 +1,5 @@
 import React from 'react';
-import { ContentBlock, TextBlock, ToolUseBlock, ToolResultBlock, ThinkingBlock } from '@/lib/claude';
+import { ContentBlock, TextBlock, ToolUseBlock, ToolResultBlock, ThinkingBlock, ImageBlock } from '@/lib/claude';
 import ReactMarkdown from 'react-markdown';
 import rehypeRaw from 'rehype-raw';
 import { cn } from '@/lib/utils';
@@ -40,6 +40,9 @@ export const ContentBlockRenderer: React.FC<ContentBlockRendererProps> = ({
     ),
   };
 
+  // 调试信息
+  console.log('渲染内容块:', block);
+
   switch (block.type) {
     case 'text':
       const textBlock = block as TextBlock;
@@ -67,25 +70,32 @@ export const ContentBlockRenderer: React.FC<ContentBlockRendererProps> = ({
     
     case 'tool_result':
       const toolResultBlock = block as ToolResultBlock;
+      console.log('渲染工具结果块:', toolResultBlock);
+      
       return (
-        <div className={cn("tool-result my-2", className)}>
-          <div className="font-medium mb-1">
+        <div className={cn("tool-result my-2 p-4 bg-[hsl(var(--card))] rounded-lg border border-[hsl(var(--border))]", className)}>
+          <div className="font-medium mb-2 text-base">
             {toolResultBlock.is_error ? '❌ ' : '✅ '}执行结果
           </div>
           {typeof toolResultBlock.content === 'string' ? (
-            <pre className="p-2 bg-[hsl(var(--muted))] rounded-md text-xs overflow-auto">
+            <pre className="p-2 bg-[hsl(var(--muted))] rounded-md text-xs overflow-auto whitespace-pre-wrap">
               {toolResultBlock.content}
             </pre>
           ) : (
-            <div>
-              {toolResultBlock.content.map((item, index) => {
-                if (item.type === 'text') {
+            <div className="space-y-2">
+              {Array.isArray(toolResultBlock.content) && toolResultBlock.content.map((item: any, index) => {
+                if (item && item.type === 'text') {
                   return (
-                    <div key={index} className="p-2 bg-[hsl(var(--muted))] rounded-md text-xs overflow-auto">
-                      {item.text}
+                    <div key={index} className="p-2 bg-[hsl(var(--muted))] rounded-md text-xs overflow-auto whitespace-pre-wrap">
+                      <ReactMarkdown 
+                        components={markdownComponents}
+                        rehypePlugins={[rehypeRaw]}
+                      >
+                        {item.text}
+                      </ReactMarkdown>
                     </div>
                   );
-                } else if (item.type === 'image') {
+                } else if (item && item.type === 'image') {
                   return (
                     <div key={index} className="mt-2">
                       <img 
@@ -108,13 +118,26 @@ export const ContentBlockRenderer: React.FC<ContentBlockRendererProps> = ({
       return (
         <div className={cn("thinking my-2 italic text-[hsl(var(--muted-foreground))]", className)}>
           <div className="font-medium mb-1">🤔 思考中...</div>
-          <div className="p-2 bg-[hsl(var(--muted))] rounded-md text-xs overflow-auto">
+          <div className="p-2 bg-[hsl(var(--muted))] rounded-md text-xs overflow-auto whitespace-pre-wrap">
             {thinkingBlock.thinking}
           </div>
         </div>
       );
     
+    case 'image':
+      const imageBlock = block as ImageBlock;
+      return (
+        <div className={cn("my-2", className)}>
+          <img 
+            src={`data:image/png;base64,${imageBlock.source.data}`}
+            alt="图像"
+            className="max-w-full rounded-md border border-[hsl(var(--border))]"
+          />
+        </div>
+      );
+    
     default:
-      return <div>未知内容类型</div>;
+      console.warn('未知内容类型:', block);
+      return <div>未知内容类型: {(block as any).type}</div>;
   }
 }; 

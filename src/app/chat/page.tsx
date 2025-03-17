@@ -11,9 +11,7 @@ import { core, event } from '@tauri-apps/api';
 import { Menu, Plus, Sparkles } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import { v4 as uuidv4 } from 'uuid';
-const { invoke } = core;
-const { listen } = event;
-
+import { useRouter } from 'next/navigation';
 import {
   callClaudeAPI,
   Message as ClaudeMessage,
@@ -21,10 +19,40 @@ import {
   ContentBlock,
   TextBlock,
   ThinkingBlock,
-  ToolResult,
   ToolUseBlock,
+  ToolResultBlock,
+  ImageBlock,
+  ToolResult,
   ClaudeApiClient
 } from '@/lib/claude';
+const { invoke } = core;
+const { listen } = event;
+
+// 临时定义useSettings hook，实际项目中应该从providers中导入
+const useSettings = () => {
+  // 返回默认设置
+  return {
+    settings: {
+      apiKey: '',
+      apiProvider: 'anthropic',
+      modelVersion: 'claude-3-opus-20240229',
+      maxOutputTokens: 4000,
+      customSystemPrompt: '',
+      onlyNMostRecentImages: 10,
+      thinkingEnabled: true,
+      thinkingBudget: 1000,
+      tokenEfficientToolsBeta: true,
+      enableComputerTool: true,
+      enableBashTool: true,
+      enableEditTool: true,
+      toolVersion: 'computer_use_20250124',
+      computerToolOptions: {
+        display_width_px: 1280,
+        display_height_px: 720
+      }
+    }
+  };
+};
 
 // 消息类型
 interface Message {
@@ -209,7 +237,6 @@ export default function ChatPage() {
       if (!existingMessage) {
         // 如果没有当前响应ID或找不到对应消息，创建新的助手消息
         const responseId = currentResponseId || `response-${uuidv4()}`;
-        console.log('创建新的助手消息，ID:', responseId);
         setCurrentResponseId(responseId);
 
         const assistantMessage: Message = {
@@ -225,22 +252,19 @@ export default function ChatPage() {
           // 检查是否已经有相同ID的消息
           const hasMessage = prev.some(m => m.id === responseId);
           if (hasMessage) {
-            console.log('已存在相同ID的消息，更新它:', responseId);
             // 如果已经有相同ID的消息，更新它
             return prev.map(m =>
               m.id === responseId
-                ? { ...m, blocks: [textBlock] }
+                ? { ...m, blocks: [...m.blocks.filter(b => b.type !== 'text'), textBlock] }
                 : m
             );
           } else {
-            console.log('添加新消息，ID:', responseId);
             // 否则添加新消息
             return [...prev, assistantMessage];
           }
         });
       } else {
         // 更新现有助手消息
-        console.log('更新现有助手消息，ID:', currentResponseId);
         setMessages(prev =>
           prev.map(m =>
             m.id === currentResponseId
@@ -306,6 +330,8 @@ export default function ChatPage() {
 
   // 处理工具结果
   const handleToolResult = (result: ToolResult, toolUseId: string) => {
+    console.log('收到工具结果:', result, '工具ID:', toolUseId);
+    
     // 查找对应的工具调用
     const toolCall = tools.find(t => t.id === toolUseId);
 
@@ -323,39 +349,71 @@ export default function ChatPage() {
       // 更新工具列表
       setTools(prev => [...prev, toolResult]);
 
-      // 将工具结果追加到当前消息内容中
-      if (currentResponseId) {
-        const resultTitle = toolCall.title.replace('正在执行', '执行结果');
-        const resultContent = result.output || result.error || '操作成功完成';
-
-        // 创建工具结果块
-        const toolResultBlock: ContentBlock = {
-          type: 'tool_result',
-          tool_use_id: toolUseId,
-          content: resultContent,
-          is_error: !!result.error
-        };
-
-        // 如果有图片，添加图片
-        if (result.base64_image) {
-          (toolResultBlock as any).base64_image = result.base64_image;
-        }
-
-        setMessages(prev =>
-          prev.map(m =>
-            m.id === currentResponseId
-              ? {
-                ...m,
-                blocks: [...m.blocks, toolResultBlock],
-                toolIds: [...(m.toolIds || []), toolResult.id]
-              }
-              : m
-          )
-        );
+      // 创建工具结果块内容
+      let content: (TextBlock | ImageBlock)[] = [];
+      
+      // 添加文本内容
+      if (result.output || result.error) {
+        content.push({
+          type: 'text',
+          text: result.output || result.error || ''
+        } as TextBlock);
+      }
+      
+      // 如果有图片，添加图片
+      if (result.base64_image) {
+        content.push({
+          type: 'image',
+          source: {
+            type: 'base64',
+            media_type: 'image/png',
+            data: result.base64_image
+          }
+        } as ImageBlock);
       }
 
+      // 创建工具结果块
+      const toolResultBlock: ToolResultBlock = {
+        type: 'tool_result',
+        tool_use_id: toolUseId,
+        content: content.length > 0 ? content : (result.output || result.error || ''),
+        is_error: !!result.error
+      };
+
+      // 创建一个新的用户消息，包含工具结果
+      const toolResultMessage: Message = {
+        id: uuidv4(),
+        role: 'user',
+        blocks: [toolResultBlock],
+        timestamp: new Date(),
+      };
+
+      // 添加工具结果消息到消息列表
+      setMessages(prev => {
+        const newMessages = [...prev, toolResultMessage];
+        console.log('更新后的消息列表:', newMessages);
+        return newMessages;
+      });
+
+      // 更新Claude消息列表
+      setClaudeMessages(prev => {
+        const newClaudeMessages = [
+          ...prev,
+          {
+            role: 'user' as const,
+            content: [toolResultBlock]
+          }
+        ];
+        console.log('更新后的Claude消息列表:', newClaudeMessages);
+        return newClaudeMessages;
+      });
+
       // 滚动到底部
-      scrollToBottom();
+      setTimeout(() => {
+        scrollToBottom();
+      }, 100);
+    } else {
+      console.error('找不到对应的工具调用:', toolUseId);
     }
   };
 
@@ -432,17 +490,19 @@ export default function ChatPage() {
         if (currentSession) {
           const updatedSession = {
             ...currentSession,
-            blocks: [...messages, userMessage],
-            claudeMessages: updatedClaudeMessages,
-            tools: tools,
-            lastUpdated: new Date(),
+            lastMessage: content.substring(0, 30) + (content.length > 30 ? '...' : ''),
+            timestamp: new Date(),
           };
 
           // 更新会话列表
           setSessions(prev => prev.map(s => s.id === currentSessionId ? updatedSession : s));
 
           // 保存到本地存储
-          // TODO: 实现本地存储
+          try {
+            localStorage.setItem('maestro-sessions', JSON.stringify(sessions));
+          } catch (error) {
+            console.error('Failed to save sessions to local storage:', error);
+          }
         }
       }
 
@@ -478,7 +538,6 @@ export default function ChatPage() {
 
       // 完成对话后，将临时消息ID替换为永久ID
       if (currentResponseId) {
-        console.log('对话完成，将临时ID替换为永久ID:', currentResponseId);
         const permanentId = uuidv4();
         setMessages(prev =>
           prev.map(m =>
@@ -491,38 +550,11 @@ export default function ChatPage() {
 
       // 重置当前响应ID
       setCurrentResponseId(null);
-
-      // 重置处理状态
-      setIsProcessing(false);
-
-      // 保存更新后的会话状态
-      if (currentSessionId) {
-        const currentSession = sessions.find(s => s.id === currentSessionId);
-        if (currentSession) {
-          // 不需要再次替换ID，因为我们已经在前面替换过了
-          const finalMessages = messages;
-
-          const updatedSession = {
-            ...currentSession,
-            blocks: finalMessages,
-            claudeMessages: result.messages,
-            tools: tools,
-            lastUpdated: new Date(),
-          };
-
-          // 更新会话列表
-          setSessions(prev => prev.map(s => s.id === currentSessionId ? updatedSession : s));
-
-          // 保存到本地存储
-          // TODO: 实现本地存储
-        }
-      }
     } catch (error) {
       console.error('发送消息时出错:', error);
 
       // 重置状态
       setCurrentResponseId(null);
-      setIsProcessing(false);
 
       // 显示错误消息
       const errorMessage = error instanceof Error
