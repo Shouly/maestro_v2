@@ -22,7 +22,8 @@ import {
   TextBlock,
   ThinkingBlock,
   ToolResult,
-  ToolUseBlock
+  ToolUseBlock,
+  ClaudeApiClient
 } from '@/lib/claude';
 
 // 消息类型
@@ -94,6 +95,7 @@ export default function ChatPage() {
   });
   const [isProcessing, setIsProcessing] = useState(false);
   const [currentResponseId, setCurrentResponseId] = useState<string | null>(null);
+  const [apiClient, setApiClient] = useState<ClaudeApiClient | null>(null);
 
   // 滚动到底部函数
   const scrollToBottom = () => {
@@ -357,6 +359,51 @@ export default function ChatPage() {
     }
   };
 
+  // 处理停止生成
+  const handleStopGeneration = () => {
+    if (apiClient) {
+      console.log('停止生成');
+      const wasAborted = apiClient.abort();
+      
+      if (wasAborted) {
+        // 立即更新UI状态
+        setIsLoading(false);
+        setIsProcessing(false);
+        
+        // 添加一个明确的停止提示消息
+        if (currentResponseId) {
+          setMessages(prev =>
+            prev.map(m =>
+              m.id === currentResponseId
+                ? {
+                  ...m,
+                  blocks: [...m.blocks, {
+                    type: 'text',
+                    text: '（用户已停止生成）'
+                  } as TextBlock],
+                }
+                : m
+            )
+          );
+          
+          // 添加一个工具提示，更明显地显示停止状态
+          const stopTool: Tool = {
+            id: uuidv4(),
+            type: 'info',
+            title: '生成已停止',
+            content: '用户已手动停止生成过程。',
+            timestamp: new Date(),
+          };
+          
+          setTools(prev => [...prev, stopTool]);
+        }
+        
+        // 滚动到底部
+        scrollToBottom();
+      }
+    }
+  };
+
   // 发送消息
   const handleSendMessage = async (content: string) => {
     if (!content.trim()) return;
@@ -417,7 +464,7 @@ export default function ChatPage() {
       }
 
       // 调用Claude API
-      const updatedMessages = await callClaudeAPI(
+      const result = await callClaudeAPI(
         updatedClaudeMessages,
         {
           apiKey: settings.apiKey,
@@ -440,8 +487,11 @@ export default function ChatPage() {
         handleToolResult
       );
 
+      // 保存API客户端实例
+      setApiClient(result.client);
+
       // 更新Claude消息列表
-      setClaudeMessages(updatedMessages);
+      setClaudeMessages(result.messages);
 
       // 完成对话后，将临时消息ID替换为永久ID
       if (currentResponseId) {
@@ -472,7 +522,7 @@ export default function ChatPage() {
           const updatedSession = {
             ...currentSession,
             blocks: finalMessages,
-            claudeMessages: updatedMessages,
+            claudeMessages: result.messages,
             tools: tools,
             lastUpdated: new Date(),
           };
@@ -748,6 +798,7 @@ export default function ChatPage() {
             <div className="p-4 border-t border-[hsl(var(--border))]">
               <ChatInput
                 onSend={handleSendMessage}
+                onStop={handleStopGeneration}
                 isLoading={isLoading}
                 placeholder="输入消息..."
               />

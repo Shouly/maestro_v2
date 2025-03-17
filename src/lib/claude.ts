@@ -249,7 +249,7 @@ export async function callClaudeAPI(
   config: ClaudeConfig,
   onContentBlock?: (block: ContentBlock) => void,
   onToolResult?: (result: ToolResult, toolUseId: string) => void
-): Promise<Message[]> {
+): Promise<{ messages: Message[], client: ClaudeApiClient }> {
   // 获取工具组
   const toolGroup = TOOL_GROUPS_BY_VERSION[config.toolVersion];
   
@@ -300,7 +300,7 @@ export async function callClaudeAPI(
   });
   
   // 调用API
-  return client.handleToolCalls(
+  const updatedMessages = await client.handleToolCalls(
     messages,
     config.model,
     config.maxTokens,
@@ -310,4 +310,8 @@ export async function callClaudeAPI(
     onToolResult,
     options
   );
+  
+  return { messages: updatedMessages, client };
 }
+
+export { ClaudeApiClient };

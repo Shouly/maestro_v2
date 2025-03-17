@@ -1,14 +1,15 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Send, Mic, Paperclip } from 'lucide-react';
+import { Send, Mic, Paperclip, Square } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 interface ChatInputProps extends React.TextareaHTMLAttributes<HTMLTextAreaElement> {
   onSend: (message: string) => void;
+  onStop?: () => void;
   isLoading?: boolean;
 }
 
 export const ChatInput = React.forwardRef<HTMLTextAreaElement, ChatInputProps>(
-  ({ className, onSend, isLoading = false, ...props }, ref) => {
+  ({ className, onSend, onStop, isLoading = false, ...props }, ref) => {
     const [message, setMessage] = useState('');
     const textareaRef = useRef<HTMLTextAreaElement | null>(null);
     
@@ -64,34 +65,47 @@ export const ChatInput = React.forwardRef<HTMLTextAreaElement, ChatInputProps>(
           {...props}
         />
         <div className="absolute bottom-2 right-2 flex space-x-1">
-          <button
-            type="button"
-            className="p-1.5 rounded-md text-[hsl(var(--muted-foreground))] hover:text-[hsl(var(--foreground))] hover:bg-[hsl(var(--accent))/10] transition-colors"
-            aria-label="附加文件"
-          >
-            <Paperclip className="w-5 h-5" />
-          </button>
-          <button
-            type="button"
-            className="p-1.5 rounded-md text-[hsl(var(--muted-foreground))] hover:text-[hsl(var(--foreground))] hover:bg-[hsl(var(--accent))/10] transition-colors"
-            aria-label="语音输入"
-          >
-            <Mic className="w-5 h-5" />
-          </button>
-          <button
-            type="button"
-            onClick={handleSend}
-            disabled={!message.trim() || isLoading}
-            className={cn(
-              "p-1.5 rounded-md transition-colors",
-              message.trim() && !isLoading
-                ? "text-[hsl(var(--primary))] hover:bg-[hsl(var(--primary))/10]"
-                : "text-[hsl(var(--muted-foreground))]"
-            )}
-            aria-label="发送消息"
-          >
-            <Send className="w-5 h-5" />
-          </button>
+          {!isLoading ? (
+            <>
+              <button
+                type="button"
+                className="p-1.5 rounded-md text-[hsl(var(--muted-foreground))] hover:text-[hsl(var(--foreground))] hover:bg-[hsl(var(--accent))/10] transition-colors"
+                aria-label="附加文件"
+              >
+                <Paperclip className="w-5 h-5" />
+              </button>
+              <button
+                type="button"
+                className="p-1.5 rounded-md text-[hsl(var(--muted-foreground))] hover:text-[hsl(var(--foreground))] hover:bg-[hsl(var(--accent))/10] transition-colors"
+                aria-label="语音输入"
+              >
+                <Mic className="w-5 h-5" />
+              </button>
+              <button
+                type="button"
+                onClick={handleSend}
+                disabled={!message.trim() || isLoading}
+                className={cn(
+                  "p-1.5 rounded-md transition-colors",
+                  message.trim() && !isLoading
+                    ? "text-[hsl(var(--primary))] hover:bg-[hsl(var(--primary))/10]"
+                    : "text-[hsl(var(--muted-foreground))]"
+                )}
+                aria-label="发送消息"
+              >
+                <Send className="w-5 h-5" />
+              </button>
+            </>
+          ) : (
+            <button
+              type="button"
+              onClick={onStop}
+              className="p-1.5 rounded-md text-red-500 hover:bg-red-100 transition-colors"
+              aria-label="停止生成"
+            >
+              <Square className="w-5 h-5" />
+            </button>
+          )}
         </div>
       </div>
     );

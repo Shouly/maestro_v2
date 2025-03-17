@@ -5,6 +5,7 @@ import { ContentBlock, ImageBlock, Message, TextBlock, Tool, ToolResult, ToolRes
 // Claude API 客户端
 export class ClaudeApiClient {
   private client: Anthropic;
+  private abortController: AbortController | null = null;
 
   constructor(apiKey: string) {
     if (!apiKey || apiKey.trim() === '') {
@@ -18,6 +19,19 @@ export class ClaudeApiClient {
         'anthropic-beta': 'computer-use-2025-01-24,token-efficient-tools-2025-02-19,prompt-caching-2024-07-31'
       }
     });
+  }
+
+  // 取消当前请求
+  abort() {
+    if (this.abortController) {
+      console.log('取消当前请求');
+      this.abortController.abort('用户取消了请求');
+      this.abortController = null;
+      
+      // 返回一个标志，表示请求已被取消
+      return true;
+    }
+    return false;
   }
 
   // 处理工具调用
@@ -37,6 +51,10 @@ export class ClaudeApiClient {
       promptCaching?: boolean;
     }
   ): Promise<Message[]> {
+    // 创建新的AbortController
+    this.abortController = new AbortController();
+    const signal = this.abortController.signal;
+
     // 转换消息格式为Anthropic API兼容格式
     const anthropicMessages = this.convertToAnthropicMessages(messages);
 
@@ -132,8 +150,11 @@ export class ClaudeApiClient {
         system: systemPromptArray as any,
         tools: anthropicTools as any,
         ...extraParams,
-      });
+      }, { signal });
 
+      // 请求完成后清除AbortController
+      this.abortController = null;
+      
       // 打印完整响应，用于调试
       console.log('Claude API 完整响应:', JSON.stringify(response, null, 2));
 
@@ -217,6 +238,24 @@ export class ClaudeApiClient {
         const { id: toolUseId, name: toolName, input: toolInput } = toolUseBlock;
 
         try {
+          // 检查是否已取消请求
+          if (this.abortController === null) {
+            console.log('请求已取消，停止处理工具调用');
+            const cancelResult: ToolResult = {
+              error: '用户取消了请求',
+            };
+            
+            // 回调工具结果
+            if (onToolResult) {
+              onToolResult(cancelResult, toolUseId);
+            }
+            
+            // 创建工具结果块
+            const toolResultBlock = this.makeToolResultBlock(cancelResult, toolUseId);
+            toolResultContent.push(toolResultBlock);
+            continue;
+          }
+          
           let result: ToolResult;
 
           // 根据工具类型执行不同的操作
@@ -409,6 +448,29 @@ export class ClaudeApiClient {
       );
     } catch (error) {
       console.error('Error calling Anthropic API:', error);
+      
+      // 检查是否是取消请求导致的错误
+      if (error instanceof Error && error.name === 'AbortError') {
+        console.log('请求被用户取消');
+        
+        // 创建一个取消响应消息
+        const cancelTextBlock: TextBlock = {
+          type: 'text',
+          text: '请求已被用户取消。'
+        };
+        
+        // 如果有回调，通知UI
+        if (onContentBlock) {
+          onContentBlock(cancelTextBlock);
+        }
+        
+        // 返回带有取消信息的消息列表
+        return [...messages, {
+          role: 'assistant',
+          content: [cancelTextBlock],
+        }];
+      }
+      
       throw error;
     }
   }
