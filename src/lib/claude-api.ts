@@ -6,6 +6,7 @@ import { ContentBlock, ImageBlock, Message, TextBlock, Tool, ToolResult, ToolRes
 export class ClaudeApiClient {
   private client: Anthropic;
   private abortController: AbortController | null = null;
+  private _userCancelled = false;
 
   constructor(apiKey: string) {
     if (!apiKey || apiKey.trim() === '') {
@@ -25,6 +26,7 @@ export class ClaudeApiClient {
   abort() {
     if (this.abortController) {
       console.log('取消当前请求');
+      this._userCancelled = true; // 设置用户取消标志
       this.abortController.abort();
       this.abortController = null;
       
@@ -238,11 +240,10 @@ export class ClaudeApiClient {
         const { id: toolUseId, name: toolName, input: toolInput } = toolUseBlock;
 
         try {
-          // 检查是否已取消请求
-          if (this.abortController === null) {
-            console.log('请求已取消，停止处理工具调用');
+          // 检查是否已取消请求 - 添加一个标志来跟踪是否是用户主动取消
+          if (this.abortController === null && this._userCancelled) {
+            console.log('请求已被用户主动取消，停止处理工具调用');
             const cancelResult: ToolResult = {
-              // 移除错误信息，避免显示"用户取消了请求"
               output: '操作已取消'
             };
             
@@ -256,6 +257,9 @@ export class ClaudeApiClient {
             toolResultContent.push(toolResultBlock);
             continue;
           }
+          
+          // 重置取消标志，确保工具调用可以正常进行
+          this._userCancelled = false;
           
           let result: ToolResult;
 
@@ -453,6 +457,7 @@ export class ClaudeApiClient {
       // 检查是否是取消请求导致的错误
       if (error instanceof Error && error.name === 'AbortError') {
         console.log('请求被用户取消');
+        this._userCancelled = true; // 设置用户取消标志
         
         // 不添加任何取消消息，直接返回当前消息列表
         return messages;
