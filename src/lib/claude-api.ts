@@ -42,20 +42,34 @@ export class ClaudeApiClient {
       // 基本工具定义
       if (tool.name === 'computer') {
         // 对于计算机工具，使用Anthropic定义的工具格式
-        const toolVersion = tool.input_schema.properties.action.enum.includes('wait') 
-          ? 'computer_20250124' 
-          : 'computer_20241022';
+        const toolVersion = "computer_20250124";
         
-        // 与Python版本保持一致，将选项展开为顶级属性
+        // 根据文档，计算机工具应该只有type和name，其他参数作为单独的顶级属性
         return {
-          name: tool.name,
           type: toolVersion,
-          // 展开选项作为顶级属性
-          ...(tool.options || {})
+          name: tool.name,
+          display_width_px: tool.options?.display_width_px,
+          display_height_px: tool.options?.display_height_px,
+          display_number: tool.options?.display_number ?? 1
+        };
+      } else if (tool.name === 'bash') {
+        // 对于bash工具，使用Anthropic定义的工具格式
+        const toolVersion = 'bash_20250124';
+        return {
+          type: toolVersion,
+          name: tool.name
+        };
+      } else if (tool.name === 'edit') {
+        // 对于编辑工具，使用Anthropic定义的工具格式
+        const toolVersion = 'text_editor_20250124';
+        return {
+          type: toolVersion,
+          name: 'str_replace_editor'  // 使用正确的工具名称
         };
       } else {
         // 其他自定义工具
         return {
+          type: 'custom',
           name: tool.name,
           description: tool.description,
           input_schema: tool.input_schema,
@@ -79,17 +93,19 @@ export class ClaudeApiClient {
       this.filterRecentImages(messages, options.onlyNMostRecentImages);
     }
 
-    // 处理提示缓存
-    if (options?.promptCaching) {
-      this.injectPromptCaching(messages);
-    }
+    // 将系统提示转换为数组格式，并添加cache_control
+    const systemPromptArray = [{
+      type: 'text',
+      text: systemPrompt,
+      cache_control: { type: 'ephemeral' }
+    }];
 
     try {
       // 打印请求参数，用于调试
       console.log('Claude API 请求参数:', {
         model,
         max_tokens: Math.min(maxTokens, 64000),
-        system: systemPrompt,
+        system: systemPromptArray,
         messages: anthropicMessages,
         tools: anthropicTools,
         extraParams
@@ -99,7 +115,7 @@ export class ClaudeApiClient {
       console.log('完整提示词:', JSON.stringify({
         model,
         max_tokens: Math.min(maxTokens, 64000),
-        system: systemPrompt,
+        system: systemPromptArray,
         messages: anthropicMessages,
         tools: anthropicTools,
         ...extraParams
@@ -110,7 +126,7 @@ export class ClaudeApiClient {
         model: model,
         max_tokens: Math.min(maxTokens, 64000),
         messages: anthropicMessages as any,
-        system: systemPrompt,
+        system: systemPromptArray as any,
         tools: anthropicTools as any,
         ...extraParams,
       });
@@ -403,17 +419,31 @@ export class ClaudeApiClient {
       // 转换消息内容
       const content = message.content.map(block => {
         if (block.type === 'text') {
-          return { type: 'text', text: (block as TextBlock).text };
+          const textBlock = block as TextBlock;
+          // 为所有文本块添加cache_control属性
+          return { 
+            type: 'text', 
+            text: textBlock.text,
+            cache_control: textBlock.cache_control || { type: 'ephemeral' }
+          };
         } else if (block.type === 'tool_result') {
           const toolResultBlock = block as ToolResultBlock;
           let content;
 
           if (typeof toolResultBlock.content === 'string') {
-            content = [{ type: 'text', text: toolResultBlock.content }];
+            content = [{ 
+              type: 'text', 
+              text: toolResultBlock.content,
+              cache_control: { type: 'ephemeral' }
+            }];
           } else {
             content = toolResultBlock.content.map(item => {
               if (item.type === 'text') {
-                return { type: 'text', text: item.text };
+                return { 
+                  type: 'text', 
+                  text: item.text,
+                  cache_control: { type: 'ephemeral' }
+                };
               } else if (item.type === 'image') {
                 return {
                   type: 'image',
@@ -461,6 +491,7 @@ export class ClaudeApiClient {
       content.push({
         type: 'text',
         text: this.maybePrependSystemToolResult(result, result.output),
+        cache_control: { type: 'ephemeral' }
       });
     }
 
@@ -490,6 +521,7 @@ export class ClaudeApiClient {
       content.push({
         type: 'text',
         text: this.maybePrependSystemToolResult(result, '命令执行完成，但没有输出'),
+        cache_control: { type: 'ephemeral' }
       });
     }
 
@@ -509,32 +541,6 @@ export class ClaudeApiClient {
       return `<system>${result.system}</system>\n${resultText}`;
     }
     return resultText;
-  }
-
-  // 注入提示缓存控制
-  private injectPromptCaching(messages: Message[]): void {
-    // 为最近3个回合设置缓存断点
-    let breakpointsRemaining = 3;
-
-    for (let i = messages.length - 1; i >= 0; i--) {
-      const message = messages[i];
-      if (message.role === 'user' && Array.isArray(message.content) && message.content.length > 0) {
-        if (breakpointsRemaining > 0) {
-          breakpointsRemaining--;
-          // 添加缓存控制
-          const lastContent = message.content[message.content.length - 1];
-          (lastContent as any).cache_control = { type: 'ephemeral' };
-        } else {
-          // 移除缓存控制
-          const lastContent = message.content[message.content.length - 1];
-          if ((lastContent as any).cache_control) {
-            delete (lastContent as any).cache_control;
-          }
-          // 只处理一个额外的回合
-          break;
-        }
-      }
-    }
   }
 
   // 过滤保留最近的图像

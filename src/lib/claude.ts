@@ -50,6 +50,7 @@ export type ContentBlock = TextBlock | ToolUseBlock | ToolResultBlock | ImageBlo
 export interface TextBlock {
   type: 'text';
   text: string;
+  cache_control?: { type: 'ephemeral' };
 }
 
 // 思考块
@@ -286,7 +287,7 @@ export async function callClaudeAPI(
     thinkingBudget: config.thinkingBudget,
     onlyNMostRecentImages: config.onlyNMostRecentImages,
     tokenEfficientToolsBeta: config.tokenEfficientToolsBeta,
-    promptCaching: config.promptCaching || false
+    promptCaching: false // 不再需要，我们已经默认为所有消息添加缓存控制
   };
   
   // 打印配置和工具信息，用于调试
