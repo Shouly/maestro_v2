@@ -94,6 +94,19 @@ export interface ToolResult {
   system?: string;
 }
 
+// 处理工具结果，确保图片数据正确传递
+export function processToolResult(result: ToolResult): ToolResult {
+  // 打印调试信息
+  console.log('处理工具结果:', {
+    hasOutput: !!result.output,
+    hasError: !!result.error,
+    hasImage: !!result.base64_image,
+    imageLength: result.base64_image ? result.base64_image.length : 0
+  });
+  
+  return result;
+}
+
 // Claude配置接口
 export interface ClaudeConfig {
   apiKey: string;

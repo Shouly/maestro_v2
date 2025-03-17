@@ -91,6 +91,7 @@ export const ContentBlockRenderer: React.FC<ContentBlockRendererProps> = ({
           ) : (
             <div className="space-y-2">
               {Array.isArray(toolResultBlock.content) && toolResultBlock.content.map((item: any, index) => {
+                console.log('工具结果内容项:', item);
                 if (item && item.type === 'text') {
                   return (
                     <div key={index} className="p-2 bg-[hsl(var(--muted))] rounded-md text-xs overflow-auto whitespace-pre-wrap">
@@ -103,6 +104,7 @@ export const ContentBlockRenderer: React.FC<ContentBlockRendererProps> = ({
                     </div>
                   );
                 } else if (item && item.type === 'image') {
+                  console.log('渲染图片:', item.source);
                   return (
                     <div key={index} className="mt-2">
                       <img 
@@ -133,6 +135,7 @@ export const ContentBlockRenderer: React.FC<ContentBlockRendererProps> = ({
     
     case 'image':
       const imageBlock = block as ImageBlock;
+      console.log('渲染独立图片块:', imageBlock);
       return (
         <div className={cn("my-2", className)}>
           <img 

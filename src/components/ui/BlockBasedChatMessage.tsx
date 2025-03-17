@@ -1,7 +1,7 @@
 import React from 'react';
 import { User, Bot, Loader2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { ContentBlock } from '@/lib/claude';
+import { ContentBlock, ToolResultBlock } from '@/lib/claude';
 import { ContentBlockRenderer } from './ContentBlockRenderer';
 
 export type MessageRole = 'user' | 'assistant' | 'system';
@@ -30,6 +30,21 @@ export const BlockBasedChatMessage: React.FC<BlockBasedChatMessageProps> = ({
 
   // 检查是否只包含工具结果块
   const isToolResultOnly = blocks.length === 1 && blocks[0].type === 'tool_result';
+  
+  // 调试信息
+  if (isToolResultOnly) {
+    console.log('渲染工具结果消息:', blocks[0]);
+    const toolResultBlock = blocks[0] as ToolResultBlock;
+    if (Array.isArray(toolResultBlock.content)) {
+      console.log('工具结果内容数组长度:', toolResultBlock.content.length);
+      toolResultBlock.content.forEach((item, index) => {
+        console.log(`内容项 ${index}:`, item.type);
+        if (item.type === 'image' && item.source) {
+          console.log('图片数据长度:', item.source.data.length);
+        }
+      });
+    }
+  }
 
   // 如果是只包含工具结果的用户消息，使用特殊样式
   if (isUser && isToolResultOnly) {
@@ -96,7 +111,7 @@ export const BlockBasedChatMessage: React.FC<BlockBasedChatMessageProps> = ({
               ) : (
                 <div>
                   {isUser ? (
-                    // 用户消息只显示文本块，但要确保工具使用块也能显示
+                    // 用户消息显示所有块
                     blocks.map((block, index) => (
                       <ContentBlockRenderer key={index} block={block} />
                     ))

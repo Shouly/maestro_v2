@@ -23,7 +23,8 @@ import {
   ToolResultBlock,
   ImageBlock,
   ToolResult,
-  ClaudeApiClient
+  ClaudeApiClient,
+  processToolResult
 } from '@/lib/claude';
 const { invoke } = core;
 const { listen } = event;
@@ -342,6 +343,9 @@ export default function ChatPage() {
   const handleToolResult = (result: ToolResult, toolUseId: string) => {
     console.log('收到工具结果:', result, '工具ID:', toolUseId);
     
+    // 处理工具结果，确保图片数据正确传递
+    const processedResult = processToolResult(result);
+    
     // 查找对应的工具调用
     const toolCall = tools.find(t => t.id === toolUseId);
 
@@ -349,10 +353,10 @@ export default function ChatPage() {
       // 创建工具结果
       const toolResult: Tool = {
         id: uuidv4(),
-        type: result.error ? 'error' : 'success',
+        type: processedResult.error ? 'error' : 'success',
         title: `${toolCall.title.replace('正在执行', '执行结果')}`,
-        content: result.output || result.error || '操作成功完成',
-        imageData: result.base64_image,
+        content: processedResult.output || processedResult.error || '操作成功完成',
+        imageData: processedResult.base64_image,
         timestamp: new Date(),
       };
 
@@ -363,21 +367,22 @@ export default function ChatPage() {
       let content: (TextBlock | ImageBlock)[] = [];
       
       // 添加文本内容
-      if (result.output || result.error) {
+      if (processedResult.output || processedResult.error) {
         content.push({
           type: 'text',
-          text: result.output || result.error || ''
+          text: processedResult.output || processedResult.error || ''
         } as TextBlock);
       }
       
       // 如果有图片，添加图片
-      if (result.base64_image) {
+      if (processedResult.base64_image) {
+        console.log('添加图片到工具结果，图片数据长度:', processedResult.base64_image.length);
         content.push({
           type: 'image',
           source: {
             type: 'base64',
             media_type: 'image/png',
-            data: result.base64_image
+            data: processedResult.base64_image
           }
         } as ImageBlock);
       }
@@ -386,9 +391,16 @@ export default function ChatPage() {
       const toolResultBlock: ToolResultBlock = {
         type: 'tool_result',
         tool_use_id: toolUseId,
-        content: content.length > 0 ? content : (result.output || result.error || ''),
-        is_error: !!result.error
+        content: content.length > 0 ? content : (processedResult.output || processedResult.error || ''),
+        is_error: !!processedResult.error
       };
+
+      console.log('创建的工具结果块:', JSON.stringify(toolResultBlock, (key, value) => {
+        if (key === 'data' && typeof value === 'string' && value.length > 100) {
+          return value.substring(0, 100) + '... [截断]';
+        }
+        return value;
+      }));
 
       // 创建一个新的用户消息，包含工具结果
       const toolResultMessage: Message = {
@@ -401,7 +413,7 @@ export default function ChatPage() {
       // 添加工具结果消息到消息列表
       setMessages(prev => {
         const newMessages = [...prev, toolResultMessage];
-        console.log('更新后的消息列表(添加工具结果):', newMessages);
+        console.log('更新后的消息列表(添加工具结果):', newMessages.length, '条消息');
         return newMessages;
       });
 
@@ -414,7 +426,7 @@ export default function ChatPage() {
             content: [toolResultBlock]
           }
         ];
-        console.log('更新后的Claude消息列表:', newClaudeMessages);
+        console.log('更新后的Claude消息列表:', newClaudeMessages.length, '条消息');
         return newClaudeMessages;
       });
 
