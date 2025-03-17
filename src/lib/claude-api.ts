@@ -25,7 +25,7 @@ export class ClaudeApiClient {
   abort() {
     if (this.abortController) {
       console.log('取消当前请求');
-      this.abortController.abort('用户取消了请求');
+      this.abortController.abort();
       this.abortController = null;
       
       // 返回一个标志，表示请求已被取消
@@ -242,7 +242,8 @@ export class ClaudeApiClient {
           if (this.abortController === null) {
             console.log('请求已取消，停止处理工具调用');
             const cancelResult: ToolResult = {
-              error: '用户取消了请求',
+              // 移除错误信息，避免显示"用户取消了请求"
+              output: '操作已取消'
             };
             
             // 回调工具结果
@@ -453,22 +454,8 @@ export class ClaudeApiClient {
       if (error instanceof Error && error.name === 'AbortError') {
         console.log('请求被用户取消');
         
-        // 创建一个取消响应消息
-        const cancelTextBlock: TextBlock = {
-          type: 'text',
-          text: '请求已被用户取消。'
-        };
-        
-        // 如果有回调，通知UI
-        if (onContentBlock) {
-          onContentBlock(cancelTextBlock);
-        }
-        
-        // 返回带有取消信息的消息列表
-        return [...messages, {
-          role: 'assistant',
-          content: [cancelTextBlock],
-        }];
+        // 不添加任何取消消息，直接返回当前消息列表
+        return messages;
       }
       
       throw error;

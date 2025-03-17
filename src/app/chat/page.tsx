@@ -370,33 +370,16 @@ export default function ChatPage() {
         setIsLoading(false);
         setIsProcessing(false);
         
-        // 添加一个明确的停止提示消息
-        if (currentResponseId) {
-          setMessages(prev =>
-            prev.map(m =>
-              m.id === currentResponseId
-                ? {
-                  ...m,
-                  blocks: [...m.blocks, {
-                    type: 'text',
-                    text: '（用户已停止生成）'
-                  } as TextBlock],
-                }
-                : m
-            )
-          );
-          
-          // 添加一个工具提示，更明显地显示停止状态
-          const stopTool: Tool = {
-            id: uuidv4(),
-            type: 'info',
-            title: '生成已停止',
-            content: '用户已手动停止生成过程。',
-            timestamp: new Date(),
-          };
-          
-          setTools(prev => [...prev, stopTool]);
-        }
+        // 添加一个工具提示，显示停止状态
+        const stopTool: Tool = {
+          id: uuidv4(),
+          type: 'info',
+          title: '生成已停止',
+          content: '用户已手动停止生成过程。',
+          timestamp: new Date(),
+        };
+        
+        setTools(prev => [...prev, stopTool]);
         
         // 滚动到底部
         scrollToBottom();
